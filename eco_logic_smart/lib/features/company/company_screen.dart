@@ -1,26 +1,46 @@
 import 'package:flutter/material.dart';
 
+import '../../models/company_account.dart';
+import '../../services/local_account_store.dart';
 import '../../shared/components.dart';
-import '../auth/login_screen.dart';
+import '../auth/splash_screen.dart';
 
 class CompanyScreen extends StatefulWidget {
-  const CompanyScreen({super.key});
+  const CompanyScreen({super.key, required this.account});
+
+  final CompanyAccount account;
+
   @override
   State<CompanyScreen> createState() => _CompanyScreenState();
 }
 
 class _CompanyScreenState extends State<CompanyScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _business = TextEditingController(text: 'Hotel Bahía Verde');
-  final _contact = TextEditingController(text: 'Andrea Martínez');
-  final _location = TextEditingController(text: 'Cartagena, Bolívar');
-  String _sector = 'Turismo y hotelería';
+  late final _business = TextEditingController(
+    text: widget.account.businessName,
+  );
+  late final _contact = TextEditingController(text: widget.account.contactName);
+  late final _location = TextEditingController(text: widget.account.city);
+  late String _sector = widget.account.sector;
+
   @override
   void dispose() {
     _business.dispose();
     _contact.dispose();
     _location.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+    final updated = widget.account.copyWith(
+      businessName: _business.text.trim(),
+      contactName: _contact.text.trim(),
+      city: _location.text.trim(),
+      sector: _sector,
+    );
+    await LocalAccountStore.updateProfile(updated);
+    if (mounted) Navigator.pop(context, updated);
   }
 
   @override
@@ -35,7 +55,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
         IconButton(
           tooltip: 'Cerrar sesión',
           onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+            MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
             (route) => false,
           ),
           icon: const Icon(Icons.logout_rounded),
@@ -64,7 +84,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
                   ),
                   SizedBox(height: 12),
                   Text(
-                    'Información operativa',
+                    'Información de tu empresa',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
@@ -73,7 +93,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
                   ),
                   SizedBox(height: 5),
                   Text(
-                    'Usamos estos datos para organizar recursos y conectar oportunidades entre negocios.',
+                    'Estos datos identifican tu espacio de trabajo y sus publicaciones.',
                     style: TextStyle(fontSize: 12, color: Color(0xFF597260)),
                   ),
                 ],
@@ -87,9 +107,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
                 labelText: 'Nombre del negocio',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Ingresa el nombre del negocio'
-                  : null,
+              validator: _required('Ingresa el nombre del negocio'),
             ),
             const SizedBox(height: 14),
             TextFormField(
@@ -98,9 +116,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
                 labelText: 'Persona de contacto',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Ingresa un contacto'
-                  : null,
+              validator: _required('Ingresa una persona de contacto'),
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
@@ -119,12 +135,14 @@ class _CompanyScreenState extends State<CompanyScreen> {
                         'Otro',
                       ]
                       .map(
-                        (value) =>
-                            DropdownMenuItem(value: value, child: Text(value)),
+                        (sector) => DropdownMenuItem(
+                          value: sector,
+                          child: Text(sector),
+                        ),
                       )
                       .toList(),
-              onChanged: (value) {
-                if (value != null) setState(() => _sector = value);
+              onChanged: (sector) {
+                if (sector != null) setState(() => _sector = sector);
               },
             ),
             const SizedBox(height: 14),
@@ -134,33 +152,28 @@ class _CompanyScreenState extends State<CompanyScreen> {
                 labelText: 'Ciudad o zona',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Ingresa una ubicación'
-                  : null,
+              validator: _required('Ingresa la ciudad o zona'),
             ),
-            const SizedBox(height: 22),
-            const SectionTitle('Privacidad y alcance'),
+            const SizedBox(height: 14),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Correo de acceso',
+                border: OutlineInputBorder(),
+              ),
+              child: Text(widget.account.email),
+            ),
+            const SizedBox(height: 18),
             const InfoCard(
               icon: Icons.lock_outline,
-              title: 'Tus finanzas no son necesarias',
+              title: 'Información financiera privada',
               subtitle:
-                  'No solicitamos ingresos, recaudos, cuentas bancarias ni estados financieros.',
-              color: Color(0xFFEAF2EA),
+                  'No solicitamos ingresos, cuentas bancarias ni estados financieros.',
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Perfil guardado en esta demostración'),
-                    ),
-                  );
-                  Navigator.pop(context);
-                }
-              },
+              onPressed: _saveProfile,
               icon: const Icon(Icons.check),
-              label: const Text('Guardar información'),
+              label: const Text('Guardar perfil'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
@@ -170,4 +183,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
       ),
     ),
   );
+
+  String? Function(String?) _required(String message) =>
+      (value) => value == null || value.trim().isEmpty ? message : null;
 }

@@ -11,7 +11,9 @@ flutter run
 
 ## Pantallas del prototipo
 
-- Inicio de sesión: validación básica de correo y contraseña y acceso a la demostración.
+- Inicio de sesión: valida cuentas locales creadas en el dispositivo o navegador.
+- Registro de empresa: guarda el perfil localmente y abre el espacio personalizado de esa empresa.
+- Carga: muestra el isotipo mientras Flutter inicializa la aplicación.
 
 - Inicio: resumen operativo e impacto estimado.
 - Diagnóstico: hallazgos operativos demostrativos y oportunidades de mejora.
@@ -21,4 +23,4 @@ flutter run
 - Indicadores: seguimiento de metas e impacto estimado.
 - Perfil de empresa: registro de datos operativos básicos y sector.
 
-El prototipo presenta datos de muestra. Los formularios guardan información solo durante la sesión y todavía no hay persistencia ni servicios conectados; la autenticación es solo una navegación de demostración.
+Las cuentas y los perfiles se conservan localmente con SharedPreferences; los módulos operativos aún usan datos de demostración y no se sincronizan entre dispositivos ni tienen backend.

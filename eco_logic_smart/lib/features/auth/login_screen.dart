@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app_shell.dart';
+import '../../services/local_account_store.dart';
+import '../company/company_registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _hidePassword = true;
+  bool _isSigningIn = false;
 
   @override
   void dispose() {
@@ -22,10 +25,27 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _enterApp() {
+  Future<void> _enterApp() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSigningIn = true);
+    final account = await LocalAccountStore.authenticate(
+      email: _email.text,
+      password: _password.text,
+    );
+    if (!mounted) return;
+    if (account == null) {
+      setState(() => _isSigningIn = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No encontramos una cuenta con esos datos en este dispositivo. Crea una cuenta de empresa primero.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const AppShell()),
+      MaterialPageRoute<void>(builder: (_) => AppShell(account: account)),
     );
   }
 
@@ -49,47 +69,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Center(
-                    child: Container(
-                      width: 66,
-                      height: 66,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF173E35),
-                        borderRadius: BorderRadius.circular(21),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x33173E35),
-                            blurRadius: 18,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.eco_rounded,
-                        color: Colors.white,
-                        size: 34,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'EcoLogiSmart',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF173E35),
-                      fontSize: 25,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'GESTIÓN LOGÍSTICA SOSTENIBLE',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF718077),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
+                    child: Image.asset(
+                      'assets/images/ecologismart_logo.png',
+                      width: 360,
+                      height: 194,
+                      fit: BoxFit.contain,
+                      semanticLabel:
+                          'EcoLogiSmart, Ingeniería Industrial para un futuro sostenible',
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -222,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           FilledButton(
-                            onPressed: _enterApp,
+                            onPressed: _isSigningIn ? null : _enterApp,
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFF173E35),
                               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -230,29 +216,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            child: const Text(
-                              'Iniciar sesión',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          OutlinedButton.icon(
-                            onPressed: () =>
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => const AppShell(),
+                            child: _isSigningIn
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Iniciar sesión',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                            icon: const Icon(Icons.explore_outlined),
-                            label: const Text('Explorar demostración'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF285A43),
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              side: const BorderSide(color: Color(0xFFD9E4DA)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    const CompanyRegistrationScreen(),
                               ),
                             ),
+                            icon: const Icon(Icons.business_outlined),
+                            label: const Text('Crear cuenta de empresa'),
                           ),
                         ],
                       ),

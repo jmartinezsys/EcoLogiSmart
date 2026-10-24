@@ -8,7 +8,7 @@ La plataforma busca facilitar decisiones operativas y promover la economía circ
 
 ## Módulos del prototipo
 
-- **Acceso e inicio:** inicio de sesión demostrativo y resumen de operación con oportunidades cercanas.
+- **Acceso e inicio:** creación de cuenta local, validación de inicio de sesión y panel de empresa personalizado.
 - **Diagnóstico operativo:** oportunidades sobre inventario, materiales recuperables y entregas agrupables.
 - **Recursos e inventario:** existencias y registro de recursos y consumos operativos.
 - **Economía circular:** materiales aprovechables disponibles para conexión entre negocios.
@@ -18,7 +18,7 @@ La plataforma busca facilitar decisiones operativas y promover la economía circ
 
 ## Aplicación
 
-La app está desarrollada con Flutter y Dart en `eco_logic_smart/`. Las pantallas forman un prototipo navegable y utilizan datos demostrativos. Los formularios no persisten información y no existe todavía una conexión con servicios externos o base de datos.
+La app está desarrollada con Flutter y Dart en `eco_logic_smart/`. Las cuentas y los perfiles de empresa se guardan localmente en el dispositivo o navegador; las contraseñas se guardan como hashes con sal. No hay sincronización entre dispositivos ni servicio de autenticación en la nube. Los módulos de inventario, publicaciones y rutas todavía usan datos de demostración.
 
 ## Requisitos e inicio
 
@@ -41,13 +41,19 @@ flutter analyze
 ```text
 eco_logic_smart/lib/
 ├── app.dart
+├── app_shell.dart
 ├── main.dart
+├── models/
+│   └── company_account.dart
+├── services/
+│   └── local_account_store.dart
 ├── shared/
 │   └── components.dart
 └── features/
-    ├── circular/
+    ├── auth/
     ├── company/
     ├── dashboard/
+    ├── circular/
     ├── indicators/
     ├── logistics/
     └── resources/
@@ -55,4 +61,4 @@ eco_logic_smart/lib/
 
 ## Alcance
 
-El prototipo cubre los flujos visuales iniciales para el emprendimiento de Ingeniería Industrial con enfoque STEAM, orientado a hoteles, restaurantes, comercios y negocios de servicios. La validación con usuarios, la persistencia de datos y las integraciones reales corresponden a fases posteriores.
+El prototipo cubre los flujos visuales iniciales para el emprendimiento de Ingeniería Industrial con enfoque STEAM, orientado a hoteles, restaurantes, comercios y negocios de servicios. La sincronización multiempresa, la autenticación en la nube y la persistencia de la operación corresponden a fases posteriores.

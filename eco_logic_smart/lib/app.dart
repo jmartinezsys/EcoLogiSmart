@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'features/auth/login_screen.dart';
+import 'features/auth/splash_screen.dart';
 
 class EcoLogiSmartApp extends StatelessWidget {
   const EcoLogiSmartApp({super.key});
@@ -27,7 +27,7 @@ class EcoLogiSmartApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const LoginScreen(),
+      home: const SplashScreen(),
     );
   }
 }
