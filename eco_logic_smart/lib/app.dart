@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'features/dashboard/dashboard_screen.dart';
+import 'features/auth/login_screen.dart';
 
 class EcoLogiSmartApp extends StatelessWidget {
   const EcoLogiSmartApp({super.key});
@@ -9,7 +9,6 @@ class EcoLogiSmartApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const forest = Color(0xFF173E35);
     const leaf = Color(0xFF3B8D68);
-
     return MaterialApp(
       title: 'EcoLogiSmart',
       debugShowCheckedModeBanner: false,
@@ -22,14 +21,13 @@ class EcoLogiSmartApp extends StatelessWidget {
           secondary: leaf,
           surface: Colors.white,
         ),
-        fontFamily: 'Roboto',
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFFF5F7F3),
           foregroundColor: forest,
           elevation: 0,
         ),
       ),
-      home: const DashboardScreen(),
+      home: const LoginScreen(),
     );
   }
 }
