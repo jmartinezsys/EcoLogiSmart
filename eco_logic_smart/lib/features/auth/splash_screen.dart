@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app_shell.dart';
+import '../../models/company_account.dart';
+import '../../services/account_repository.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,10 +16,21 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 900), () {
+    Future<void>.delayed(const Duration(milliseconds: 900), () async {
+      if (!mounted) return;
+      CompanyAccount? account;
+      try {
+        account = await AccountRepository.currentAccount();
+      } catch (_) {
+        account = null;
+      }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+        MaterialPageRoute<void>(
+          builder: (_) => account == null
+              ? const LoginScreen()
+              : AppShell(account: account),
+        ),
       );
     });
   }

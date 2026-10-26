@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app_shell.dart';
-import '../../services/local_account_store.dart';
+import '../../services/account_repository.dart';
+import '../../services/backend_config.dart';
 import '../company/company_registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -28,25 +30,81 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _enterApp() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSigningIn = true);
-    final account = await LocalAccountStore.authenticate(
-      email: _email.text,
-      password: _password.text,
-    );
-    if (!mounted) return;
-    if (account == null) {
+    try {
+      final account = await AccountRepository.authenticate(
+        email: _email.text,
+        password: _password.text,
+      );
+      if (!mounted) return;
+      if (account == null) {
+        setState(() => _isSigningIn = false);
+        _showMessage('No encontramos una cuenta con esos datos.');
+        return;
+      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => AppShell(account: account)),
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
       setState(() => _isSigningIn = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No encontramos una cuenta con esos datos en este dispositivo. Crea una cuenta de empresa primero.',
+      _showMessage(_friendlyAuthError(error.message));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSigningIn = false);
+      _showMessage('No pudimos conectar con el servicio. Intenta de nuevo.');
+    }
+  }
+
+  void _showMessage(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
+
+  String _friendlyAuthError(String message) {
+    final normalized = message.toLowerCase();
+    if (normalized.contains('invalid login credentials')) {
+      return 'Correo o contraseña incorrectos.';
+    }
+    if (normalized.contains('email not confirmed')) {
+      return 'Confirma tu correo electrónico antes de iniciar sesión.';
+    }
+    if (normalized.contains('network')) return 'Revisa tu conexión a internet.';
+    return message;
+  }
+
+  Future<void> _recoverPassword() async {
+    if (!AccountRepository.isCloudEnabled) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Recuperar contraseña'),
+          content: const Text(
+            'La recuperación de contraseña requiere configurar el servicio de autenticación en la nube.',
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
         ),
       );
       return;
     }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => AppShell(account: account)),
-    );
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      _showMessage(
+        'Escribe tu correo para enviarte el enlace de recuperación.',
+      );
+      return;
+    }
+    try {
+      await AccountRepository.sendPasswordReset(email);
+      if (mounted) _showMessage('Enviamos un enlace de recuperación a $email.');
+    } catch (_) {
+      if (mounted) {
+        _showMessage('No pudimos enviar el enlace. Intenta de nuevo.');
+      }
+    }
   }
 
   @override
@@ -78,6 +136,51 @@ class _LoginScreenState extends State<LoginScreen> {
                           'EcoLogiSmart, Ingeniería Industrial para un futuro sostenible',
                     ),
                   ),
+                  if (!BackendConfig.isRequested) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1D8),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Modo demostración · Los datos se guardan en este dispositivo',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF79521A),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (BackendConfig.isRequested &&
+                      !BackendConfig.isInitialized) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFE8E6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'La conexión con la nube no está lista. Revisa URL y clave de Supabase.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF8A3028),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 30),
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -188,21 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () => showDialog<void>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Recuperar contraseña'),
-                                  content: const Text(
-                                    'La recuperación de contraseña estará disponible cuando se conecte el servicio de autenticación.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('Entendido'),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              onPressed: _recoverPassword,
                               child: const Text('¿Olvidaste tu contraseña?'),
                             ),
                           ),

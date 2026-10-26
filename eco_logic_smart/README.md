@@ -1,6 +1,6 @@
 # EcoLogiSmart Flutter App
 
-Aplicación Flutter del prototipo EcoLogiSmart. Consulta el [README del repositorio](../README.md) para conocer el objetivo, alcance y módulos del proyecto.
+Aplicación Flutter EcoLogiSmart. Consulta la [documentación del proyecto](../documentacion_proyecto.md) para conocer objetivo, alcance y plan de trabajo. El [README del repositorio](../README.md) documenta módulos, backend y configuración.
 
 ## Inicio rápido
 
@@ -9,18 +9,12 @@ flutter pub get
 flutter run
 ```
 
-## Pantallas del prototipo
+Sin `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`, la app inicia en modo demostración y guarda operaciones en el dispositivo. Para usar la nube, configura ambos valores con `--dart-define` y ejecuta en el SQL Editor la migración ubicada en `supabase/migrations/`.
 
-- Inicio de sesión: valida cuentas locales creadas en el dispositivo o navegador.
-- Registro de empresa: guarda el perfil localmente y abre el espacio personalizado de esa empresa.
-- Carga: muestra el isotipo mientras Flutter inicializa la aplicación.
+En Supabase Auth, agrega `co.ecologismart.app://login-callback` a **URL Configuration → Redirect URLs** para recuperación de contraseña móvil. En web, agrega también el origen donde se publique la app.
 
-- Inicio: resumen operativo e impacto estimado.
-- Diagnóstico: hallazgos operativos demostrativos y oportunidades de mejora.
-- Recursos: inventario y registro local de recursos y consumos.
-- Circular: materiales disponibles e interfaz para publicar excedentes.
-- Rutas: oportunidades de consolidación y solicitud de transporte.
-- Indicadores: seguimiento de metas e impacto estimado.
-- Perfil de empresa: registro de datos operativos básicos y sector.
+## Flujo de la aplicación
 
-Las cuentas y los perfiles se conservan localmente con SharedPreferences; los módulos operativos aún usan datos de demostración y no se sincronizan entre dispositivos ni tienen backend.
+El flujo incluye autenticación, registro de empresa, recuperación de contraseña, carga inicial con sesión restaurada y perfil empresarial. El tablero ofrece acceso al diagnóstico. Inventario, publicaciones, imágenes y logística usan repositorios con implementación local de demostración y persistencia en Supabase cuando está configurado.
+
+La clave `service_role` nunca va dentro de la aplicación móvil. Aplica las políticas RLS de la migración antes de compartir el Project URL y la clave pública con una compilación.

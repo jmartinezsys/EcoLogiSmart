@@ -1,108 +1,93 @@
 import 'package:flutter/material.dart';
 
+import '../../models/company_account.dart';
+import '../../models/operational_records.dart';
+import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 
 class ResourcesScreen extends StatefulWidget {
-  const ResourcesScreen({super.key});
+  const ResourcesScreen({super.key, required this.account});
+  final CompanyAccount account;
   @override
   State<ResourcesScreen> createState() => _ResourcesScreenState();
 }
 
 class _ResourcesScreenState extends State<ResourcesScreen> {
-  final _items = <Map<String, String>>[
-    {
-      'name': 'Suministros de limpieza',
-      'detail': 'Insumos · Actualizado hoy',
-      'amount': '18 unidades',
-    },
-    {
-      'name': 'Envases de vidrio',
-      'detail': 'Reutilizables · Almacén',
-      'amount': '42 unidades',
-    },
-    {
-      'name': 'Lencería hotelera',
-      'detail': 'Textiles · Bodega',
-      'amount': '26 unidades',
-    },
-    {
-      'name': 'Empaques de cartón',
-      'detail': 'Embalaje · Bodega',
-      'amount': '64 unidades',
-    },
-  ];
+  List<InventoryItem> _items = [];
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
   String _query = '';
 
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    try {
+      final items = await WorkspaceRepository.loadInventory(widget.account);
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _loading = false;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'No se pudo cargar el inventario. Revisa tu conexión.';
+      });
+    }
+  }
+
   Future<void> _addItem() async {
-    final name = TextEditingController();
-    final quantity = TextEditingController();
-    final saved = await showDialog<bool>(
+    final saved = await showDialog<InventoryItem>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Agregar recurso'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(
-                labelText: 'Nombre del recurso',
-              ),
-            ),
-            TextField(
-              controller: quantity,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Cantidad disponible',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
+      builder: (_) => const _InventoryDialog(),
     );
-    if (saved == true && name.text.trim().isNotEmpty && mounted) {
-      setState(
-        () => _items.insert(0, {
-          'name': name.text.trim(),
-          'detail': 'Recurso · Agregado ahora',
-          'amount':
-              '${quantity.text.trim().isEmpty ? '0' : quantity.text.trim()} unidades',
-        }),
-      );
+    if (saved != null && mounted) {
+      setState(() => _saving = true);
+      try {
+        await WorkspaceRepository.saveInventory(widget.account, saved);
+        await _loadItems();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo guardar el recurso.')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final visible = _items
-        .where(
-          (item) => item['name']!.toLowerCase().contains(_query.toLowerCase()),
-        )
+        .where((item) => item.name.toLowerCase().contains(_query.toLowerCase()))
         .toList();
+    final lowStock = _items
+        .where((item) => item.quantity <= item.lowStockThreshold)
+        .length;
     return PageFrame(
       title: 'Recursos e inventario',
       subtitle: 'Controla existencias y anticipa necesidades.',
       action: IconButton.filledTonal(
-        onPressed: _addItem,
+        tooltip: 'Agregar recurso',
+        onPressed: _saving ? null : _addItem,
         icon: const Icon(Icons.add),
       ),
       children: [
         Row(
-          children: const [
+          children: [
             Expanded(
               child: MetricTile(
                 label: 'Productos',
-                value: '86',
+                value: '${_items.length}',
                 icon: Icons.inventory_2_outlined,
                 detail: 'en 4 categorías',
               ),
@@ -111,7 +96,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
             Expanded(
               child: MetricTile(
                 label: 'Por reponer',
-                value: '7',
+                value: '$lowStock',
                 icon: Icons.notification_important_outlined,
                 detail: 'nivel bajo',
               ),
@@ -134,13 +119,32 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        for (final item in visible)
-          InfoCard(
+        if (_loading)
+          const Center(child: CircularProgressIndicator())
+        else if (_error != null)
+          TextButton.icon(
+            onPressed: _loadItems,
+            icon: const Icon(Icons.refresh),
+            label: Text(_error!),
+          )
+        else if (visible.isEmpty)
+          const InfoCard(
             icon: Icons.inventory_2_outlined,
-            title: item['name']!,
-            subtitle: item['detail']!,
-            trailing: item['amount'],
-          ),
+            title: 'Aún no hay recursos',
+            subtitle:
+                'Agrega un recurso para iniciar el inventario de tu empresa.',
+          )
+        else
+          for (final item in visible)
+            InfoCard(
+              icon: Icons.inventory_2_outlined,
+              title: item.name,
+              subtitle: [
+                item.category,
+                'Nivel mínimo ${item.lowStockThreshold} ${item.unit}',
+              ].where((part) => part.isNotEmpty).join(' · '),
+              trailing: '${item.quantity} ${item.unit}',
+            ),
         const SizedBox(height: 10),
         const SectionTitle('Consumo de recursos'),
         const InfoCard(
@@ -162,5 +166,105 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         ),
       ],
     );
+  }
+}
+
+class _InventoryDialog extends StatefulWidget {
+  const _InventoryDialog();
+
+  @override
+  State<_InventoryDialog> createState() => _InventoryDialogState();
+}
+
+class _InventoryDialogState extends State<_InventoryDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _quantity = TextEditingController();
+  final _unit = TextEditingController(text: 'unidades');
+  final _category = TextEditingController();
+  final _threshold = TextEditingController(text: '0');
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _quantity.dispose();
+    _unit.dispose();
+    _category.dispose();
+    _threshold.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(
+      context,
+      InventoryItem(
+        id: '',
+        name: _name.text.trim(),
+        quantity: double.parse(_quantity.text.trim().replaceAll(',', '.')),
+        unit: _unit.text.trim().isEmpty ? 'unidades' : _unit.text.trim(),
+        category: _category.text.trim(),
+        lowStockThreshold: double.parse(
+          _threshold.text.trim().replaceAll(',', '.'),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Agregar recurso'),
+    scrollable: true,
+    content: Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Nombre del recurso'),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Escribe el nombre del recurso'
+                : null,
+          ),
+          TextFormField(
+            controller: _quantity,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Cantidad disponible'),
+            validator: _validateNumber,
+          ),
+          TextFormField(
+            controller: _unit,
+            decoration: const InputDecoration(labelText: 'Unidad'),
+          ),
+          TextFormField(
+            controller: _category,
+            decoration: const InputDecoration(labelText: 'Categoría'),
+          ),
+          TextFormField(
+            controller: _threshold,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Nivel mínimo para alerta',
+            ),
+            validator: _validateNumber,
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('Guardar')),
+    ],
+  );
+
+  String? _validateNumber(String? value) {
+    final number = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+    return number == null || number < 0
+        ? 'Ingresa un número igual o mayor que cero'
+        : null;
   }
 }

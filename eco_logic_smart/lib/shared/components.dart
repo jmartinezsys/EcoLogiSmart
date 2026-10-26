@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/backend_config.dart';
+
 class PageFrame extends StatelessWidget {
   const PageFrame({
     super.key,
@@ -51,8 +53,12 @@ class PageFrame extends StatelessWidget {
               const SizedBox(height: 22),
               ...children,
               const SizedBox(height: 18),
-              const Text(
-                'Datos de demostración · EcoLogiSmart',
+              Text(
+                BackendConfig.isInitialized
+                    ? 'Datos sincronizados · EcoLogiSmart'
+                    : BackendConfig.isRequested
+                    ? 'No se pudo iniciar la conexión con la nube'
+                    : 'Modo demostración · Datos guardados en este dispositivo',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Color(0xFF87938A), fontSize: 11),
               ),

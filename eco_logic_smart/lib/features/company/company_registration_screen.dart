@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app_shell.dart';
 import '../../models/company_account.dart';
-import '../../services/local_account_store.dart';
+import '../../services/account_repository.dart';
 
 class CompanyRegistrationScreen extends StatefulWidget {
   const CompanyRegistrationScreen({super.key});
@@ -22,6 +23,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
   final _confirmPassword = TextEditingController();
   String _sector = 'Turismo y hotelería';
   bool _hidePassword = true;
+  bool _isRegistering = false;
 
   @override
   void dispose() {
@@ -43,23 +45,73 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
       sector: _sector,
       city: _location.text.trim(),
     );
-    final registered = await LocalAccountStore.register(
-      account: account,
-      password: _password.text,
-    );
-    if (!mounted) return;
-    if (!registered) {
+    setState(() => _isRegistering = true);
+    try {
+      final result = await AccountRepository.register(
+        account: account,
+        password: _password.text,
+      );
+      if (!mounted) return;
+      if (result.emailConfirmationRequired) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirma tu correo'),
+            content: Text(
+              'Enviamos un enlace a ${account.email}. Confirma tu cuenta y luego inicia sesión.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) Navigator.pop(context);
+        return;
+      }
+      final registeredAccount = result.account;
+      if (registeredAccount == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ya existe una cuenta con ese correo.')),
+        );
+        return;
+      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => AppShell(account: registeredAccount),
+        ),
+        (route) => false,
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlyAuthError(error.message))),
+      );
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ya existe una cuenta local con ese correo.'),
+          content: Text(
+            'No pudimos crear la cuenta. Revisa la conexión e inténtalo de nuevo.',
+          ),
         ),
       );
-      return;
+    } finally {
+      if (mounted) setState(() => _isRegistering = false);
     }
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => AppShell(account: account)),
-      (route) => false,
-    );
+  }
+
+  String _friendlyAuthError(String message) {
+    final normalized = message.toLowerCase();
+    if (normalized.contains('already registered')) {
+      return 'Ya existe una cuenta con ese correo.';
+    }
+    if (normalized.contains('password')) {
+      return 'La contraseña no cumple los requisitos.';
+    }
+    return message;
   }
 
   @override
@@ -204,15 +256,17 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   : null,
             ),
             const SizedBox(height: 18),
-            const Text(
-              'La cuenta se guarda localmente en este dispositivo o navegador. No se sincroniza con otros dispositivos.',
+            Text(
+              'La cuenta se guardará en ${AccountRepository.isCloudEnabled ? 'la nube' : 'este dispositivo (modo demostración)'}.',
               style: TextStyle(fontSize: 11, color: Color(0xFF78847C)),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _register,
+              onPressed: _isRegistering ? null : _register,
               icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('Crear cuenta y continuar'),
+              label: _isRegistering
+                  ? const Text('Creando cuenta…')
+                  : const Text('Crear cuenta y continuar'),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF173E35),
                 padding: const EdgeInsets.symmetric(vertical: 16),

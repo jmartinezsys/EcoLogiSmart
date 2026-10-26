@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'features/circular/circular_screen.dart';
+import 'features/circular/circular_workspace_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
-import 'features/indicators/indicators_screen.dart';
-import 'features/logistics/logistics_screen.dart';
+import 'features/indicators/indicators_workspace_screen.dart';
+import 'features/logistics/logistics_workspace_screen.dart';
 import 'features/resources/resources_screen.dart';
 import 'models/company_account.dart';
 
@@ -33,10 +33,10 @@ class _AppShellState extends State<AppShell> {
         account: _account,
         onAccountUpdated: (account) => setState(() => _account = account),
       ),
-      const ResourcesScreen(),
-      const CircularScreen(),
-      const LogisticsScreen(),
-      const IndicatorsScreen(),
+      ResourcesScreen(account: _account),
+      CircularWorkspaceScreen(account: _account),
+      LogisticsWorkspaceScreen(account: _account),
+      IndicatorsWorkspaceScreen(account: _account),
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),

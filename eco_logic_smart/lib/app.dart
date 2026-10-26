@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'features/auth/splash_screen.dart';
+import 'shared/app_navigation.dart';
 
 class EcoLogiSmartApp extends StatelessWidget {
   const EcoLogiSmartApp({super.key});
@@ -10,6 +11,7 @@ class EcoLogiSmartApp extends StatelessWidget {
     const forest = Color(0xFF173E35);
     const leaf = Color(0xFF3B8D68);
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'EcoLogiSmart',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

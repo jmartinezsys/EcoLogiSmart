@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../models/company_account.dart';
+import '../../models/operational_records.dart';
+import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 import '../company/company_screen.dart';
+import '../diagnosis/diagnosis_workspace_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
     required this.account,
@@ -14,22 +17,71 @@ class DashboardScreen extends StatelessWidget {
   final CompanyAccount account;
   final ValueChanged<CompanyAccount> onAccountUpdated;
 
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late CompanyAccount _account = widget.account;
+  int _inventoryCount = 0;
+  int _materialCount = 0;
+  int _routeCount = 0;
+  bool _loadingActivity = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivity();
+  }
+
+  String get _ownerId => _account.id.isNotEmpty
+      ? _account.id
+      : _account.email.trim().toLowerCase();
+
+  Future<void> _loadActivity() async {
+    try {
+      final results = await Future.wait([
+        WorkspaceRepository.loadInventory(_account),
+        WorkspaceRepository.loadMaterials(),
+        WorkspaceRepository.loadRoutes(),
+      ]);
+      final inventory = results[0] as List<InventoryItem>;
+      final materials = results[1] as List<MaterialListing>;
+      final routes = results[2] as List<LogisticsRequest>;
+      if (!mounted) return;
+      setState(() {
+        _inventoryCount = inventory.length;
+        _materialCount = materials
+            .where((item) => item.companyId == _ownerId)
+            .length;
+        _routeCount = routes.where((item) => item.companyId == _ownerId).length;
+        _loadingActivity = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingActivity = false);
+    }
+  }
+
   Future<void> _openProfile(BuildContext context) async {
     final updated = await Navigator.push<CompanyAccount>(
       context,
       MaterialPageRoute<CompanyAccount>(
-        builder: (_) => CompanyScreen(account: account),
+        builder: (_) => CompanyScreen(account: _account),
       ),
     );
-    if (updated != null) onAccountUpdated(updated);
+    if (updated != null) {
+      setState(() => _account = updated);
+      widget.onAccountUpdated(updated);
+      _loadActivity();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final firstName = account.contactName.trim().split(RegExp(r'\s+')).first;
+    final firstName = _account.contactName.trim().split(RegExp(r'\s+')).first;
     return PageFrame(
       title: 'Hola, $firstName',
-      subtitle: 'Este es el espacio de ${account.businessName}.',
+      subtitle: 'Este es el espacio de ${_account.businessName}.',
       action: IconButton.filledTonal(
         tooltip: 'Perfil de empresa',
         onPressed: () => _openProfile(context),
@@ -60,7 +112,7 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                account.businessName,
+                _account.businessName,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 21,
@@ -68,25 +120,28 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _ProfileLine(icon: Icons.category_outlined, text: account.sector),
+              _ProfileLine(
+                icon: Icons.category_outlined,
+                text: _account.sector,
+              ),
               const SizedBox(height: 7),
               _ProfileLine(
                 icon: Icons.location_on_outlined,
-                text: account.city,
+                text: _account.city,
               ),
               const SizedBox(height: 7),
-              _ProfileLine(icon: Icons.alternate_email, text: account.email),
+              _ProfileLine(icon: Icons.alternate_email, text: _account.email),
             ],
           ),
         ),
         const SizedBox(height: 24),
         const SectionTitle('Tu actividad'),
-        const Row(
+        Row(
           children: [
             Expanded(
               child: MetricTile(
                 label: 'Recursos',
-                value: '0',
+                value: _loadingActivity ? '…' : '$_inventoryCount',
                 icon: Icons.inventory_2_outlined,
                 detail: 'registrados por tu empresa',
               ),
@@ -95,7 +150,7 @@ class DashboardScreen extends StatelessWidget {
             Expanded(
               child: MetricTile(
                 label: 'Materiales',
-                value: '0',
+                value: _loadingActivity ? '…' : '$_materialCount',
                 icon: Icons.recycling_outlined,
                 detail: 'publicados por tu empresa',
               ),
@@ -103,11 +158,13 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        const InfoCard(
+        InfoCard(
           icon: Icons.local_shipping_outlined,
           title: 'Solicitudes de ruta',
-          subtitle: 'Aún no hay solicitudes para esta empresa.',
-          trailing: '0',
+          subtitle: _routeCount == 0
+              ? 'Aún no hay solicitudes para esta empresa.'
+              : 'Solicitudes activas de ${_account.businessName}.',
+          trailing: _loadingActivity ? '…' : '$_routeCount',
           color: Color(0xFFFFF0DF),
         ),
         const SizedBox(height: 20),
@@ -138,6 +195,16 @@ class DashboardScreen extends StatelessWidget {
           onPressed: () => _openProfile(context),
           icon: const Icon(Icons.manage_accounts_outlined),
           label: const Text('Administrar perfil de empresa'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => DiagnosisWorkspaceScreen(account: _account),
+            ),
+          ),
+          icon: const Icon(Icons.fact_check_outlined),
+          label: const Text('Ver diagnóstico operativo'),
         ),
         const SizedBox(height: 8),
         const Text(

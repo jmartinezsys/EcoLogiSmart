@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/company_account.dart';
-import '../../services/local_account_store.dart';
+import '../../services/account_repository.dart';
 import '../../shared/components.dart';
 import '../auth/splash_screen.dart';
 
@@ -39,7 +39,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
       city: _location.text.trim(),
       sector: _sector,
     );
-    await LocalAccountStore.updateProfile(updated);
+    await AccountRepository.updateProfile(updated);
     if (mounted) Navigator.pop(context, updated);
   }
 
@@ -54,10 +54,14 @@ class _CompanyScreenState extends State<CompanyScreen> {
       actions: [
         IconButton(
           tooltip: 'Cerrar sesión',
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
-            (route) => false,
-          ),
+          onPressed: () async {
+            await AccountRepository.signOut();
+            if (!context.mounted) return;
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
+              (route) => false,
+            );
+          },
           icon: const Icon(Icons.logout_rounded),
         ),
       ],
