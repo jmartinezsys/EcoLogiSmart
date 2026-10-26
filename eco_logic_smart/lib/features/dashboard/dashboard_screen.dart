@@ -88,50 +88,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: const Icon(Icons.person_outline),
       ),
       children: [
-        Container(
-          padding: const EdgeInsets.all(19),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF173E35), Color(0xFF28664D)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(23),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF143A31), Color(0xFF28664D)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'TU EMPRESA',
-                style: TextStyle(
-                  color: Color(0xFFC6DCCB),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.1,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -24,
+                  top: -32,
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0x30FFFFFF),
+                        width: 24,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _account.businessName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'ESPACIO DE EMPRESA',
+                              style: TextStyle(
+                                color: Color(0xFFC6DCCB),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                          Image.asset(
+                            'assets/images/ecologismart_isotipo.png',
+                            width: 36,
+                            height: 36,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.eco_rounded,
+                              color: Color(0xFFD8E9DC),
+                              size: 30,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _account.businessName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _ProfilePill(
+                            icon: Icons.category_outlined,
+                            text: _account.sector,
+                          ),
+                          _ProfilePill(
+                            icon: Icons.location_on_outlined,
+                            text: _account.city,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _ProfileLine(
-                icon: Icons.category_outlined,
-                text: _account.sector,
-              ),
-              const SizedBox(height: 7),
-              _ProfileLine(
-                icon: Icons.location_on_outlined,
-                text: _account.city,
-              ),
-              const SizedBox(height: 7),
-              _ProfileLine(icon: Icons.alternate_email, text: _account.email),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -216,23 +262,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _ProfileLine extends StatelessWidget {
-  const _ProfileLine({required this.icon, required this.text});
+class _ProfilePill extends StatelessWidget {
+  const _ProfilePill({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, color: const Color(0xFFD0E3D4), size: 16),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          text,
-          style: const TextStyle(color: Color(0xFFE5F0E7), fontSize: 12),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 220),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(
+      color: const Color(0x1FFFFFFF),
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: const Color(0x26FFFFFF)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: const Color(0xFFD0E3D4), size: 14),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 11),
+          ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 }

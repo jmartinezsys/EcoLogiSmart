@@ -19,35 +19,61 @@ class PageFrame extends StatelessWidget {
     child: CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 30),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  Container(
+                    width: 43,
+                    height: 43,
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5F0E7),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Image.asset(
+                      'assets/images/ecologismart_isotipo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.eco_rounded,
+                        color: Color(0xFF28664D),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 25,
+                            fontSize: 22,
+                            height: 1.1,
                             fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
                             color: Color(0xFF1B3027),
                           ),
                         ),
                         const SizedBox(height: 5),
                         Text(
                           subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
+                            height: 1.3,
                             color: Color(0xFF78847C),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  ?action,
+                  if (action != null) ...[const SizedBox(width: 8), action!],
                 ],
               ),
               const SizedBox(height: 22),
@@ -123,8 +149,15 @@ class InfoCard extends StatelessWidget {
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(17),
-      border: Border.all(color: const Color(0xFFEBEFEA)),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE8EEE9)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x080F3322),
+          blurRadius: 16,
+          offset: Offset(0, 5),
+        ),
+      ],
     ),
     child: Row(
       children: [
@@ -145,7 +178,7 @@ class InfoCard extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF26382E),
                 ),
@@ -153,7 +186,11 @@ class InfoCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF7A867E)),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: Color(0xFF7A867E),
+                ),
               ),
             ],
           ),
@@ -189,13 +226,28 @@ class MetricTile extends StatelessWidget {
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(17),
-      border: Border.all(color: const Color(0xFFEBEFEA)),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE8EEE9)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x080F3322),
+          blurRadius: 16,
+          offset: Offset(0, 5),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF39815D)),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F2EA),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: const Color(0xFF39815D), size: 20),
+        ),
         const SizedBox(height: 12),
         Text(
           value,

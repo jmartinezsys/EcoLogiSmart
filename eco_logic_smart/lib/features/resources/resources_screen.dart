@@ -73,6 +73,11 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
     final lowStock = _items
         .where((item) => item.quantity <= item.lowStockThreshold)
         .length;
+    final categoryCount = _items
+        .map((item) => item.category.trim())
+        .where((category) => category.isNotEmpty)
+        .toSet()
+        .length;
     return PageFrame(
       title: 'Recursos e inventario',
       subtitle: 'Controla existencias y anticipa necesidades.',
@@ -89,7 +94,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                 label: 'Productos',
                 value: '${_items.length}',
                 icon: Icons.inventory_2_outlined,
-                detail: 'en 4 categorías',
+                detail: 'en $categoryCount categorías',
               ),
             ),
             SizedBox(width: 12),
@@ -145,24 +150,30 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               ].where((part) => part.isNotEmpty).join(' · '),
               trailing: '${item.quantity} ${item.unit}',
             ),
-        const SizedBox(height: 10),
-        const SectionTitle('Consumo de recursos'),
-        const InfoCard(
-          icon: Icons.water_drop_outlined,
-          title: 'Agua',
-          subtitle: 'Consumo registrado este mes',
-          trailing: '1.240 L',
-        ),
-        const InfoCard(
-          icon: Icons.bolt_outlined,
-          title: 'Energía',
-          subtitle: 'Consumo registrado este mes',
-          trailing: '860 kWh',
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'El registro de consumos es opcional y solo usa información operativa.',
-          style: TextStyle(fontSize: 11, color: Color(0xFF78847C)),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEDF3EE),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.insights_outlined, color: Color(0xFF39815D)),
+              SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  'Registra cantidades y niveles mínimos para mantener actualizado el inventario de tu empresa.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Color(0xFF52665A),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
