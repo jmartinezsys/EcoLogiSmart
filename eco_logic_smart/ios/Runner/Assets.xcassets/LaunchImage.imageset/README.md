@@ -1,5 +1,3 @@
-# Launch Screen Assets
+# Imagen de inicio de iOS
 
-You can customize the launch screen with your own desired assets by replacing the image files in this directory.
-
-You can also do it by opening your Flutter project's Xcode project with `open ios/Runner.xcworkspace`, selecting `Runner/Assets.xcassets` in the Project Navigator and dropping in the desired images.
+Esta carpeta contiene la imagen que aparece mientras la aplicación inicia en iOS. La imagen puede reemplazarse desde los archivos del conjunto `LaunchImage.imageset` o desde `Runner/Assets.xcassets` en Xcode.

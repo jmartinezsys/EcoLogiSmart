@@ -45,11 +45,30 @@
     }
     #app-loading img { width: 128px; height: 188px; object-fit: contain; }
     #app-loading.app-loading-hidden { opacity: 0; pointer-events: none; }
+    #app-loading-message {
+      margin: 12px 24px 0;
+      color: #52665a;
+      font: 500 14px/1.5 Arial, sans-serif;
+      text-align: center;
+    }
+    #app-loading-retry {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 18px;
+      color: #fff;
+      background: #173e35;
+      border: 0;
+      border-radius: 12px;
+      font: 600 14px Arial, sans-serif;
+    }
+    #app-loading.app-loading-error #app-loading-retry { display: inline-flex; }
   </style>
 </head>
 <body>
   <div id="app-loading" role="status" aria-label="Cargando EcoLogiSmart">
     <img src="branding/ecologismart_isotipo.png" alt="EcoLogiSmart">
+    <p id="app-loading-message">Iniciando la aplicación…</p>
+    <button id="app-loading-retry" type="button" onclick="window.location.reload()">Reintentar</button>
   </div>
   <script src="flutter_bootstrap.js"></script>
 </body>
