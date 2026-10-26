@@ -9,6 +9,8 @@ flutter pub get
 flutter run
 ```
 
+En VS Code abre la carpeta raíz del repositorio y selecciona una configuración `EcoLogiSmart` en **Run and Debug**. La configuración **Edge** intenta depuración integrada; si Edge queda esperando el depurador, usa **Web Server** y abre `http://127.0.0.1:5319` manualmente. Para Android conecta un teléfono con depuración USB o inicia un emulador antes de elegir la configuración **Android**.
+
 Sin `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`, la aplicación inicia en modo de demostración y guarda las operaciones en el dispositivo. La sincronización en la nube requiere ambos valores mediante `--dart-define` y la ejecución de la migración ubicada en `supabase/migrations/` desde el SQL Editor del proyecto.
 
 La recuperación de contraseña móvil requiere registrar `co.ecologismart.app://login-callback` en **URL Configuration → Redirect URLs** de Supabase Auth. Para la versión web también se registra el origen de publicación.

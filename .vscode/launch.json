@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "EcoLogiSmart (Web Server, abrir Edge manualmente)",
+      "request": "launch",
+      "type": "dart",
+      "program": "${workspaceFolder}/eco_logic_smart/lib/main.dart",
+      "cwd": "${workspaceFolder}/eco_logic_smart",
+      "deviceId": "web-server",
+      "args": ["--web-hostname=127.0.0.1", "--web-port=5319"]
+    },
+    {
+      "name": "EcoLogiSmart (Edge, depuración integrada)",
+      "request": "launch",
+      "type": "dart",
+      "program": "${workspaceFolder}/eco_logic_smart/lib/main.dart",
+      "cwd": "${workspaceFolder}/eco_logic_smart",
+      "deviceId": "edge",
+      "args": ["--web-port=5317"]
+    },
+    {
+      "name": "EcoLogiSmart (Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "${workspaceFolder}/eco_logic_smart/lib/main.dart",
+      "cwd": "${workspaceFolder}/eco_logic_smart"
+    }
+  ]
+}

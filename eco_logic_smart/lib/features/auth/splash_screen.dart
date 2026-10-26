@@ -20,7 +20,9 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
       CompanyAccount? account;
       try {
-        account = await AccountRepository.currentAccount();
+        account = await AccountRepository.currentAccount().timeout(
+          const Duration(seconds: 8),
+        );
       } catch (_) {
         account = null;
       }

@@ -18,10 +18,23 @@ class CircularWorkspaceScreen extends StatefulWidget {
 
 class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   List<MaterialListing> _listings = [];
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _quantityController = TextEditingController();
+  final _unitController = TextEditingController(text: 'kg');
   String _filter = 'Todos';
   bool _loading = true;
   bool _saving = false;
   String? _error;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _quantityController.dispose();
+    _unitController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -49,10 +62,10 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
 
   Future<void> _publish() async {
     final formKey = GlobalKey<FormState>();
-    final title = TextEditingController();
-    final description = TextEditingController();
-    final quantity = TextEditingController();
-    final unit = TextEditingController(text: 'kg');
+    final title = _titleController..clear();
+    final description = _descriptionController..clear();
+    final quantity = _quantityController..clear();
+    final unit = _unitController..text = 'kg';
     XFile? photo;
     final draft = await showDialog<_ListingDraft>(
       context: context,
@@ -179,10 +192,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         ),
       ),
     );
-    title.dispose();
-    description.dispose();
-    quantity.dispose();
-    unit.dispose();
     if (draft == null || !mounted) return;
 
     setState(() => _saving = true);

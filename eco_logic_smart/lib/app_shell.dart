@@ -18,6 +18,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  final List<int> _refreshVersions = List<int>.filled(5, 0);
   late CompanyAccount _account;
 
   @override
@@ -26,23 +27,44 @@ class _AppShellState extends State<AppShell> {
     _account = widget.account;
   }
 
+  void _selectTab(int index) {
+    setState(() {
+      _index = index;
+      _refreshVersions[index]++;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
       DashboardScreen(
+        key: ValueKey('dashboard-${_refreshVersions[0]}'),
         account: _account,
         onAccountUpdated: (account) => setState(() => _account = account),
+        onNavigate: _selectTab,
       ),
-      ResourcesScreen(account: _account),
-      CircularWorkspaceScreen(account: _account),
-      LogisticsWorkspaceScreen(account: _account),
-      IndicatorsWorkspaceScreen(account: _account),
+      ResourcesScreen(
+        key: ValueKey('resources-${_refreshVersions[1]}'),
+        account: _account,
+      ),
+      CircularWorkspaceScreen(
+        key: ValueKey('circular-${_refreshVersions[2]}'),
+        account: _account,
+      ),
+      LogisticsWorkspaceScreen(
+        key: ValueKey('logistics-${_refreshVersions[3]}'),
+        account: _account,
+      ),
+      IndicatorsWorkspaceScreen(
+        key: ValueKey('indicators-${_refreshVersions[4]}'),
+        account: _account,
+      ),
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (index) => setState(() => _index = index),
+        onDestinationSelected: _selectTab,
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFE0EEE5),
         destinations: const [

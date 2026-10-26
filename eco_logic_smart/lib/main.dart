@@ -9,7 +9,7 @@ import 'shared/app_navigation.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await BackendConfig.initialize();
+    await BackendConfig.initialize().timeout(const Duration(seconds: 12));
   } catch (_) {
     // Keep the app shell visible so the user can read the configuration error.
   }

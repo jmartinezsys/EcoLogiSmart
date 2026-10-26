@@ -133,11 +133,22 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
             label: Text(_error!),
           )
         else if (visible.isEmpty)
-          const InfoCard(
-            icon: Icons.inventory_2_outlined,
-            title: 'Aún no hay recursos',
-            subtitle:
-                'Agrega un recurso para iniciar el inventario de tu empresa.',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const InfoCard(
+                icon: Icons.inventory_2_outlined,
+                title: 'Aún no hay recursos',
+                subtitle:
+                    'Agrega un recurso para iniciar el inventario de tu empresa.',
+              ),
+              const SizedBox(height: 5),
+              FilledButton.icon(
+                onPressed: _saving ? null : _addItem,
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar recurso'),
+              ),
+            ],
           )
         else
           for (final item in visible)

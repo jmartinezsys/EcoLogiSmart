@@ -12,10 +12,12 @@ class DashboardScreen extends StatefulWidget {
     super.key,
     required this.account,
     required this.onAccountUpdated,
+    required this.onNavigate,
   });
 
   final CompanyAccount account;
   final ValueChanged<CompanyAccount> onAccountUpdated;
+  final ValueChanged<int> onNavigate;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -27,6 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _materialCount = 0;
   int _routeCount = 0;
   bool _loadingActivity = true;
+  String? _activityError;
 
   @override
   void initState() {
@@ -56,9 +59,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             .length;
         _routeCount = routes.where((item) => item.companyId == _ownerId).length;
         _loadingActivity = false;
+        _activityError = null;
       });
     } catch (_) {
-      if (mounted) setState(() => _loadingActivity = false);
+      if (mounted) {
+        setState(() {
+          _loadingActivity = false;
+          _activityError = 'No se pudo actualizar la actividad de la empresa.';
+        });
+      }
     }
   }
 
@@ -182,12 +191,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 24),
         const SectionTitle('Tu actividad'),
+        if (_activityError != null) ...[
+          InfoCard(
+            icon: Icons.cloud_off_outlined,
+            title: 'No se pudieron cargar los datos',
+            subtitle: _activityError!,
+            color: const Color(0xFFFFF0DF),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _loadActivity,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ),
+        ],
         Row(
           children: [
             Expanded(
               child: MetricTile(
                 label: 'Recursos',
-                value: _loadingActivity ? '…' : '$_inventoryCount',
+                value: _loadingActivity
+                    ? '…'
+                    : _activityError != null
+                    ? '—'
+                    : '$_inventoryCount',
                 icon: Icons.inventory_2_outlined,
                 detail: 'registrados por tu empresa',
               ),
@@ -196,7 +225,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: MetricTile(
                 label: 'Materiales',
-                value: _loadingActivity ? '…' : '$_materialCount',
+                value: _loadingActivity
+                    ? '…'
+                    : _activityError != null
+                    ? '—'
+                    : '$_materialCount',
                 icon: Icons.recycling_outlined,
                 detail: 'publicados por tu empresa',
               ),
@@ -207,35 +240,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
         InfoCard(
           icon: Icons.local_shipping_outlined,
           title: 'Solicitudes de ruta',
-          subtitle: _routeCount == 0
+          subtitle: _activityError != null
+              ? 'Los datos de actividad no están disponibles.'
+              : _routeCount == 0
               ? 'Aún no hay solicitudes para esta empresa.'
               : 'Solicitudes activas de ${_account.businessName}.',
-          trailing: _loadingActivity ? '…' : '$_routeCount',
+          trailing: _loadingActivity
+              ? '…'
+              : _activityError != null
+              ? '—'
+              : '$_routeCount',
           color: Color(0xFFFFF0DF),
         ),
         const SizedBox(height: 20),
-        const SectionTitle('Herramientas para todas las empresas'),
-        const InfoCard(
-          icon: Icons.inventory_2_outlined,
-          title: 'Inventario y recursos',
-          subtitle: 'Organiza existencias y consumos operativos.',
+        const SectionTitle('Accesos rápidos'),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = (constraints.maxWidth - 12) / 2;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _QuickActionCard(
+                  width: cardWidth,
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Inventario',
+                  subtitle: 'Recursos y alertas',
+                  onTap: () => widget.onNavigate(1),
+                ),
+                _QuickActionCard(
+                  width: cardWidth,
+                  icon: Icons.recycling_outlined,
+                  title: 'Materiales',
+                  subtitle: 'Publicar y conectar',
+                  color: const Color(0xFFE9F4E8),
+                  onTap: () => widget.onNavigate(2),
+                ),
+                _QuickActionCard(
+                  width: cardWidth,
+                  icon: Icons.route_outlined,
+                  title: 'Logística',
+                  subtitle: 'Solicitudes y rutas',
+                  color: const Color(0xFFFFF2E2),
+                  onTap: () => widget.onNavigate(3),
+                ),
+                _QuickActionCard(
+                  width: cardWidth,
+                  icon: Icons.query_stats_rounded,
+                  title: 'Indicadores',
+                  subtitle: 'Actividad de tu empresa',
+                  color: const Color(0xFFEAF0F8),
+                  onTap: () => widget.onNavigate(4),
+                ),
+              ],
+            );
+          },
         ),
-        const InfoCard(
-          icon: Icons.recycling_outlined,
-          title: 'Economía circular',
-          subtitle: 'Publica materiales para encontrarles un nuevo uso.',
-        ),
-        const InfoCard(
-          icon: Icons.route_outlined,
-          title: 'Logística compartida',
-          subtitle: 'Coordina pedidos con destinos cercanos.',
-          color: Color(0xFFFFF0DF),
-        ),
-        const InfoCard(
-          icon: Icons.query_stats_rounded,
-          title: 'Indicadores',
-          subtitle: 'Consulta la actividad e impacto de tu empresa.',
-        ),
+        if (!_loadingActivity &&
+            _activityError == null &&
+            _inventoryCount == 0) ...[
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: () => widget.onNavigate(1),
+            icon: const Icon(Icons.add),
+            label: const Text('Agregar el primer recurso'),
+          ),
+        ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: () => _openProfile(context),
@@ -291,6 +361,75 @@ class _ProfilePill extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.width,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.color = const Color(0xFFEAF2EA),
+  });
+
+  final double width;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: width,
+    child: Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 120),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE7ECE7)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: const Color(0xFF28664D), size: 20),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF26382E),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFF7A867E), fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }

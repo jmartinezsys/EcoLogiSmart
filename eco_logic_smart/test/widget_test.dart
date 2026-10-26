@@ -8,6 +8,7 @@ import 'package:eco_logic_smart/models/company_account.dart';
 import 'package:eco_logic_smart/models/operational_records.dart';
 import 'package:eco_logic_smart/services/local_account_store.dart';
 import 'package:eco_logic_smart/services/workspace_repository.dart';
+import 'package:eco_logic_smart/shared/components.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -111,6 +112,124 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Cajas reutilizables'), findsOneWidget);
     expect(find.text('15.0 unidades'), findsOneWidget);
+  });
+
+  testWidgets('dashboard refreshes company metrics after inventory changes', (
+    tester,
+  ) async {
+    const account = CompanyAccount(
+      businessName: 'Mercado Verde',
+      contactName: 'Elena Díaz',
+      email: 'elena@mercadoverde.co',
+      sector: 'Comercio',
+      city: 'Cartagena',
+    );
+    await tester.pumpWidget(MaterialApp(home: AppShell(account: account)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Recursos').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Agregar recurso'));
+    await tester.pumpAndSettle();
+
+    Future<void> enterField(String label, String value) async {
+      final field = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == label,
+      );
+      await tester.enterText(field, value);
+    }
+
+    await enterField('Nombre del recurso', 'Envases retornables');
+    await enterField('Cantidad disponible', '24');
+    await enterField('Unidad', 'unidades');
+    await enterField('Categoría', 'Empaque');
+    await enterField('Nivel mínimo para alerta', '5');
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Inicio').last);
+    await tester.pumpAndSettle();
+
+    final resourceMetric = tester
+        .widgetList<MetricTile>(find.byType(MetricTile))
+        .firstWhere((tile) => tile.label == 'Recursos');
+    expect(resourceMetric.value, '1');
+    expect(find.text('Envases retornables'), findsNothing);
+  });
+
+  testWidgets('a company can publish a material from the circular module', (
+    tester,
+  ) async {
+    const account = CompanyAccount(
+      businessName: 'Eco Taller',
+      contactName: 'Marta Ruiz',
+      email: 'marta@ecotaller.co',
+      sector: 'Servicios',
+      city: 'Cartagena',
+    );
+    await tester.pumpWidget(MaterialApp(home: AppShell(account: account)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Circular').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Publicar material'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Nombre del material',
+      ),
+      'Retazos de cartón',
+    );
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Descripción y estado',
+      ),
+      'Limpios y clasificados',
+    );
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'Cantidad',
+      ),
+      '12',
+    );
+    await tester.tap(find.text('Publicar').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Retazos de cartón'), findsOneWidget);
+  });
+
+  testWidgets('a company can register a logistics request', (tester) async {
+    const account = CompanyAccount(
+      businessName: 'Distribuidora Verde',
+      contactName: 'Julián Mora',
+      email: 'julian@distribuidoraverde.co',
+      sector: 'Comercio',
+      city: 'Cartagena',
+    );
+    await tester.pumpWidget(MaterialApp(home: AppShell(account: account)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rutas').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Solicitar ruta'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Zona de destino',
+      ),
+      'Manga',
+    );
+    await tester.tap(find.text('Enviar solicitud'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Manga'), findsOneWidget);
   });
 
   test(

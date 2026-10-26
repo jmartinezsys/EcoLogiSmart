@@ -17,9 +17,16 @@ class LogisticsWorkspaceScreen extends StatefulWidget {
 
 class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
   List<LogisticsRequest> _routes = [];
+  final _destinationController = TextEditingController();
   bool _loading = true;
   bool _saving = false;
   String? _error;
+
+  @override
+  void dispose() {
+    _destinationController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -47,7 +54,7 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
 
   Future<void> _requestRoute() async {
     final formKey = GlobalKey<FormState>();
-    final destination = TextEditingController();
+    final destination = _destinationController..clear();
     var deliveryType = 'Materiales';
     final result = await showDialog<(String, String)?>(
       context: context,
@@ -112,8 +119,9 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
         ),
       ),
     );
-    destination.dispose();
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) {
+      return;
+    }
     setState(() => _saving = true);
     try {
       await WorkspaceRepository.requestRoute(
