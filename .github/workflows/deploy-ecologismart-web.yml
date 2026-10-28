@@ -1,0 +1,59 @@
+name: Deploy EcoLogiSmart web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.9
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: eco_logic_smart
+        run: flutter pub get
+
+      - name: Build web app
+        working-directory: eco_logic_smart
+        run: >-
+          flutter build web --release --no-pub
+          --base-href /EcoLogiSmart/
+          --dart-define=SUPABASE_URL=https://hzgrinhdwemajryzexho.supabase.co
+          --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_jI1qceFcfb-WP2ANqO3YqA_lk2ppoGo
+
+      - name: Keep Flutter files visible to Pages
+        run: touch eco_logic_smart/build/web/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: eco_logic_smart/build/web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

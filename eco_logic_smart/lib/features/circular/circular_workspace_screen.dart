@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
+import '../../services/backend_config.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 
@@ -233,13 +234,26 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     );
     return PageFrame(
       title: 'Economía circular',
-      subtitle: 'Conecta materiales con nuevos usos.',
+      subtitle: 'Comparte excedentes y explora ofertas de otras empresas.',
       action: IconButton.filledTonal(
         tooltip: 'Publicar material',
         onPressed: _saving ? null : _publish,
         icon: const Icon(Icons.add),
       ),
       children: [
+        InfoCard(
+          icon: BackendConfig.isInitialized
+              ? Icons.cloud_done_outlined
+              : Icons.phone_android_outlined,
+          title: BackendConfig.isInitialized
+              ? 'Publicaciones visibles para empresas conectadas'
+              : 'Modo local de demostración',
+          subtitle: BackendConfig.isInitialized
+              ? 'El inventario sigue siendo privado. Solo compartes los materiales que publicas aquí.'
+              : 'Las publicaciones se guardan en este dispositivo. Para compartirlas entre teléfonos, conecta el proyecto a Supabase.',
+          color: const Color(0xFFEAF0F8),
+        ),
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -263,7 +277,7 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Publica excedentes para que otros negocios puedan aprovecharlos.',
+                      'Solo las publicaciones de este espacio se ofrecen a otros negocios; tu inventario permanece privado.',
                       style: TextStyle(fontSize: 11, color: Color(0xFF597260)),
                     ),
                   ],
@@ -286,7 +300,7 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: MetricTile(
-                label: 'Coincidencias',
+                label: 'Ofertas externas',
                 value:
                     '${_listings.where((item) => item.companyId != (widget.account.id.isNotEmpty ? widget.account.id : widget.account.email.toLowerCase())).length}',
                 icon: Icons.handshake_outlined,

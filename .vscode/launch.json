@@ -8,7 +8,12 @@
       "program": "${workspaceFolder}/eco_logic_smart/lib/main.dart",
       "cwd": "${workspaceFolder}/eco_logic_smart",
       "deviceId": "web-server",
-      "args": ["--web-hostname=127.0.0.1", "--web-port=5319"]
+      "args": [
+        "--web-hostname=127.0.0.1",
+        "--web-port=5319",
+        "--dart-define=SUPABASE_URL=https://hzgrinhdwemajryzexho.supabase.co",
+        "--dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_jI1qceFcfb-WP2ANqO3YqA_lk2ppoGo"
+      ]
     },
     {
       "name": "EcoLogiSmart (Edge, depuración integrada)",
@@ -17,14 +22,22 @@
       "program": "${workspaceFolder}/eco_logic_smart/lib/main.dart",
       "cwd": "${workspaceFolder}/eco_logic_smart",
       "deviceId": "edge",
-      "args": ["--web-port=5317"]
+      "args": [
+        "--web-port=5317",
+        "--dart-define=SUPABASE_URL=https://hzgrinhdwemajryzexho.supabase.co",
+        "--dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_jI1qceFcfb-WP2ANqO3YqA_lk2ppoGo"
+      ]
     },
     {
       "name": "EcoLogiSmart (Android)",
       "request": "launch",
       "type": "dart",
       "program": "${workspaceFolder}/eco_logic_smart/lib/main.dart",
-      "cwd": "${workspaceFolder}/eco_logic_smart"
+      "cwd": "${workspaceFolder}/eco_logic_smart",
+      "args": [
+        "--dart-define=SUPABASE_URL=https://hzgrinhdwemajryzexho.supabase.co",
+        "--dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_jI1qceFcfb-WP2ANqO3YqA_lk2ppoGo"
+      ]
     }
   ]
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
+import '../../services/backend_config.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 
@@ -165,6 +166,19 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
         icon: const Icon(Icons.add_road),
       ),
       children: [
+        InfoCard(
+          icon: BackendConfig.isInitialized
+              ? Icons.cloud_done_outlined
+              : Icons.phone_android_outlined,
+          title: BackendConfig.isInitialized
+              ? 'Rutas abiertas compartidas en la red'
+              : 'Rutas en demostración local',
+          subtitle: BackendConfig.isInitialized
+              ? 'Las empresas conectadas pueden ver solicitudes abiertas y buscar destinos en común.'
+              : 'Estas solicitudes solo se comparten en este dispositivo. Para conectarlas entre empresas se necesita configurar Supabase.',
+          color: const Color(0xFFEAF0F8),
+        ),
+        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -196,7 +210,7 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
               ),
               const SizedBox(height: 7),
               const Text(
-                'Las empresas pueden identificar destinos en común y coordinar una entrega.',
+                'Las coincidencias señalan destinos repetidos. La coordinación entre empresas se acuerda por fuera de esta solicitud.',
                 style: TextStyle(color: Color(0xFFD0E3D4), fontSize: 12),
               ),
             ],

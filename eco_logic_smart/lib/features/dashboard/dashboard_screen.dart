@@ -252,49 +252,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : '$_routeCount',
           color: Color(0xFFFFF0DF),
         ),
-        const SizedBox(height: 20),
-        const SectionTitle('Accesos rápidos'),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth - 12) / 2;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _QuickActionCard(
-                  width: cardWidth,
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Inventario',
-                  subtitle: 'Recursos y alertas',
-                  onTap: () => widget.onNavigate(1),
-                ),
-                _QuickActionCard(
-                  width: cardWidth,
-                  icon: Icons.recycling_outlined,
-                  title: 'Materiales',
-                  subtitle: 'Publicar y conectar',
-                  color: const Color(0xFFE9F4E8),
-                  onTap: () => widget.onNavigate(2),
-                ),
-                _QuickActionCard(
-                  width: cardWidth,
-                  icon: Icons.route_outlined,
-                  title: 'Logística',
-                  subtitle: 'Solicitudes y rutas',
-                  color: const Color(0xFFFFF2E2),
-                  onTap: () => widget.onNavigate(3),
-                ),
-                _QuickActionCard(
-                  width: cardWidth,
-                  icon: Icons.query_stats_rounded,
-                  title: 'Indicadores',
-                  subtitle: 'Actividad de tu empresa',
-                  color: const Color(0xFFEAF0F8),
-                  onTap: () => widget.onNavigate(4),
-                ),
-              ],
-            );
-          },
+        const SizedBox(height: 16),
+        const InfoCard(
+          icon: Icons.lock_outline,
+          title: 'Tu inventario es privado',
+          subtitle:
+              'Publica excedentes en Circular para ofrecerlos a otras empresas. '
+              'En Rutas puedes consultar solicitudes abiertas y detectar destinos en común.',
+          color: Color(0xFFEAF0F8),
         ),
         if (!_loadingActivity &&
             _activityError == null &&
@@ -361,75 +326,6 @@ class _ProfilePill extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
-}
-
-class _QuickActionCard extends StatelessWidget {
-  const _QuickActionCard({
-    required this.width,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.color = const Color(0xFFEAF2EA),
-  });
-
-  final double width;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: width,
-    child: Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 120),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE7ECE7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: const Color(0xFF28664D), size: 20),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF26382E),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF7A867E), fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-      ),
     ),
   );
 }

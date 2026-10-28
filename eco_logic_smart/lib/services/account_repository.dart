@@ -118,6 +118,17 @@ class AccountRepository {
     if (BackendConfig.isInitialized) await BackendConfig.client.auth.signOut();
   }
 
-  static String get _emailRedirectUri =>
-      kIsWeb ? Uri.base.origin : 'co.ecologismart.app://login-callback';
+  static String get _emailRedirectUri {
+    if (!kIsWeb) return 'co.ecologismart.app://login-callback';
+    final current = Uri.base;
+    final appPath = current.path.endsWith('/')
+        ? current.path
+        : '${current.path}/';
+    return Uri(
+      scheme: current.scheme,
+      host: current.host,
+      port: current.hasPort ? current.port : null,
+      path: appPath,
+    ).toString();
+  }
 }

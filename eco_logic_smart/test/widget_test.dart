@@ -200,6 +200,11 @@ void main() {
     );
     await tester.tap(find.text('Publicar').last);
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -600),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.text('Retazos de cartón'), findsOneWidget);
   });

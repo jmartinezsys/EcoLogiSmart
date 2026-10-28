@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.example.eco_logic_smart"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // This app does not include native C/C++ sources. Leaving NDK selection to
+    // the Android Gradle Plugin avoids pinning builds to a broken local NDK.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
