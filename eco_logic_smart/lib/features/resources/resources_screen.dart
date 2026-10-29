@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
+import '../../data/resource_catalog.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 
@@ -200,32 +201,40 @@ class _InventoryDialog extends StatefulWidget {
 
 class _InventoryDialogState extends State<_InventoryDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
   final _quantity = TextEditingController();
-  final _unit = TextEditingController(text: 'unidades');
-  final _category = TextEditingController();
+  final _customProduct = TextEditingController();
+  final _customCategory = TextEditingController();
   final _threshold = TextEditingController(text: '0');
+  String _category = ResourceCatalog.categories.first;
+  String _unit = ResourceCatalog.units.first;
+  String? _product = ResourceCatalog.productsFor(
+    ResourceCatalog.categories.first,
+  ).first;
+  bool _otherProduct = false;
 
   @override
   void dispose() {
-    _name.dispose();
     _quantity.dispose();
-    _unit.dispose();
-    _category.dispose();
+    _customProduct.dispose();
+    _customCategory.dispose();
     _threshold.dispose();
     super.dispose();
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
+    final category = _category == 'Otro'
+        ? _customCategory.text.trim()
+        : _category;
+    final name = _otherProduct ? _customProduct.text.trim() : _product!;
     Navigator.pop(
       context,
       InventoryItem(
         id: '',
-        name: _name.text.trim(),
+        name: name,
         quantity: double.parse(_quantity.text.trim().replaceAll(',', '.')),
-        unit: _unit.text.trim().isEmpty ? 'unidades' : _unit.text.trim(),
-        category: _category.text.trim(),
+        unit: _unit,
+        category: category,
         lowStockThreshold: double.parse(
           _threshold.text.trim().replaceAll(',', '.'),
         ),
@@ -242,27 +251,110 @@ class _InventoryDialogState extends State<_InventoryDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextFormField(
-            controller: _name,
-            decoration: const InputDecoration(labelText: 'Nombre del recurso'),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Escribe el nombre del recurso'
-                : null,
+          DropdownButtonFormField<String>(
+            initialValue: _category,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Categoría'),
+            items: ResourceCatalog.categories
+                .map(
+                  (category) => DropdownMenuItem(
+                    value: category,
+                    child: Text(category, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: (category) {
+              if (category == null) return;
+              setState(() {
+                _category = category;
+                final products = ResourceCatalog.productsFor(category);
+                _product = products.isEmpty ? null : products.first;
+                _otherProduct = products.isEmpty;
+              });
+            },
           ),
+          if (_category == 'Otro') ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _customCategory,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Escribe la categoría',
+              ),
+              validator: (value) =>
+                  _category == 'Otro' && (value == null || value.trim().isEmpty)
+                  ? 'Escribe la categoría del recurso'
+                  : null,
+            ),
+          ],
+          if (ResourceCatalog.productsFor(_category).isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _otherProduct ? '__other__' : _product,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Nombre del recurso',
+              ),
+              items: [
+                ...ResourceCatalog.productsFor(_category).map(
+                  (product) => DropdownMenuItem(
+                    value: product,
+                    child: Text(product, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+                const DropdownMenuItem(
+                  value: '__other__',
+                  child: Text('Otro (escribir)'),
+                ),
+              ],
+              onChanged: (product) {
+                if (product == null) return;
+                setState(() {
+                  _otherProduct = product == '__other__';
+                  _product = _otherProduct ? null : product;
+                });
+              },
+              validator: (value) =>
+                  !_otherProduct && (value == null || value.isEmpty)
+                  ? 'Selecciona un recurso'
+                  : null,
+            ),
+          ],
+          if (_otherProduct) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _customProduct,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: ResourceCatalog.productsFor(_category).isEmpty
+                    ? 'Nombre del recurso'
+                    : '¿Qué recurso es?',
+              ),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Escribe el nombre del recurso'
+                  : null,
+            ),
+          ],
+          const SizedBox(height: 12),
           TextFormField(
             controller: _quantity,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(labelText: 'Cantidad disponible'),
             validator: _validateNumber,
           ),
-          TextFormField(
-            controller: _unit,
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _unit,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Unidad'),
+            items: ResourceCatalog.units
+                .map((unit) => DropdownMenuItem(value: unit, child: Text(unit)))
+                .toList(),
+            onChanged: (unit) {
+              if (unit != null) setState(() => _unit = unit);
+            },
           ),
-          TextFormField(
-            controller: _category,
-            decoration: const InputDecoration(labelText: 'Categoría'),
-          ),
+          const SizedBox(height: 12),
           TextFormField(
             controller: _threshold,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),

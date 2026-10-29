@@ -47,6 +47,8 @@ class MaterialListing {
     required this.status,
     required this.companyName,
     required this.city,
+    this.category = '',
+    this.exchangeFor,
     this.imageUrl,
     this.localImageBytes,
   });
@@ -60,6 +62,8 @@ class MaterialListing {
   final String status;
   final String companyName;
   final String city;
+  final String category;
+  final String? exchangeFor;
   final String? imageUrl;
   final Uint8List? localImageBytes;
 
@@ -74,6 +78,8 @@ class MaterialListing {
         status: json['status'] as String? ?? 'Disponible',
         companyName: json['company_name'] as String? ?? 'Empresa EcoLogiSmart',
         city: json['city'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        exchangeFor: json['exchange_for'] as String?,
         imageUrl: json['image_url'] as String?,
         localImageBytes: json['image_base64'] is String
             ? base64Decode(json['image_base64'] as String)
@@ -86,8 +92,92 @@ class MaterialListing {
     'quantity': quantity,
     'unit': unit,
     'status': status,
+    'category': category,
+    'exchange_for': exchangeFor,
     'image_url': imageUrl,
   };
+}
+
+class MaterialExchangeRequest {
+  const MaterialExchangeRequest({
+    required this.id,
+    required this.listingId,
+    required this.requesterCompanyId,
+    required this.requesterCompanyName,
+    required this.offeredProduct,
+    required this.status,
+    required this.createdAt,
+    this.message = '',
+  });
+
+  final String id;
+  final String listingId;
+  final String requesterCompanyId;
+  final String requesterCompanyName;
+  final String offeredProduct;
+  final String status;
+  final DateTime createdAt;
+  final String message;
+
+  factory MaterialExchangeRequest.fromJson(Map<String, dynamic> json) =>
+      MaterialExchangeRequest(
+        id: json['id'] as String,
+        listingId: json['listing_id'] as String? ?? '',
+        requesterCompanyId: json['requester_company_id'] as String? ?? '',
+        requesterCompanyName:
+            json['requester_company_name'] as String? ?? 'Empresa',
+        offeredProduct: json['offered_product'] as String? ?? '',
+        status: json['status'] as String? ?? 'Pendiente',
+        createdAt:
+            DateTime.tryParse(json['created_at'] as String? ?? '') ??
+            DateTime.now(),
+        message: json['message'] as String? ?? '',
+      );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'listing_id': listingId,
+    'requester_company_id': requesterCompanyId,
+    'requester_company_name': requesterCompanyName,
+    'offered_product': offeredProduct,
+    'status': status,
+    'created_at': createdAt.toIso8601String(),
+    'message': message,
+  };
+}
+
+class RouteJoinRequest {
+  const RouteJoinRequest({
+    required this.id,
+    required this.routeId,
+    required this.requesterCompanyId,
+    required this.requesterCompanyName,
+    required this.status,
+    required this.createdAt,
+    this.message = '',
+  });
+
+  final String id;
+  final String routeId;
+  final String requesterCompanyId;
+  final String requesterCompanyName;
+  final String status;
+  final DateTime createdAt;
+  final String message;
+
+  factory RouteJoinRequest.fromJson(Map<String, dynamic> json) =>
+      RouteJoinRequest(
+        id: json['id'] as String,
+        routeId: json['route_id'] as String? ?? '',
+        requesterCompanyId: json['requester_company_id'] as String? ?? '',
+        requesterCompanyName:
+            json['requester_company_name'] as String? ?? 'Empresa',
+        status: json['status'] as String? ?? 'Pendiente',
+        createdAt:
+            DateTime.tryParse(json['created_at'] as String? ?? '') ??
+            DateTime.now(),
+        message: json['message'] as String? ?? '',
+      );
 }
 
 class LogisticsRequest {
@@ -98,6 +188,10 @@ class LogisticsRequest {
     required this.destination,
     required this.deliveryType,
     required this.createdAt,
+    this.origin = '',
+    this.cargoDescription = '',
+    this.status = 'Abierta',
+    this.travelDate,
   });
 
   final String id;
@@ -106,6 +200,10 @@ class LogisticsRequest {
   final String destination;
   final String deliveryType;
   final DateTime createdAt;
+  final String origin;
+  final String cargoDescription;
+  final String status;
+  final DateTime? travelDate;
 
   factory LogisticsRequest.fromJson(Map<String, dynamic> json) =>
       LogisticsRequest(
@@ -117,10 +215,18 @@ class LogisticsRequest {
         createdAt:
             DateTime.tryParse(json['created_at'] as String? ?? '') ??
             DateTime.now(),
+        origin: json['origin'] as String? ?? '',
+        cargoDescription: json['cargo_description'] as String? ?? '',
+        status: json['status'] as String? ?? 'Abierta',
+        travelDate: DateTime.tryParse(json['travel_date'] as String? ?? ''),
       );
 
   Map<String, Object?> toJson() => {
     'destination': destination,
     'delivery_type': deliveryType,
+    'origin': origin,
+    'cargo_description': cargoDescription,
+    'travel_date': travelDate?.toIso8601String(),
+    'status': status,
   };
 }

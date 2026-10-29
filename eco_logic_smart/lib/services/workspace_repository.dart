@@ -14,6 +14,8 @@ class WorkspaceRepository {
   static const _inventoryPrefix = 'ecologismart.inventory.v1.';
   static const _materialsKey = 'ecologismart.demo.materials.v1';
   static const _routesKey = 'ecologismart.demo.routes.v1';
+  static const _exchangesKey = 'ecologismart.demo.exchanges.v1';
+  static const _routeJoinsKey = 'ecologismart.demo.route_joins.v1';
   static const _bucket = 'material-images';
 
   static bool get _cloud => BackendConfig.isRequested;
@@ -148,6 +150,92 @@ class WorkspaceRepository {
     await preferences.setString(_materialsKey, jsonEncode(rows));
   }
 
+  static Future<List<MaterialExchangeRequest>> loadExchangeRequests() async {
+    if (_cloud) {
+      final rows = await BackendConfig.client
+          .from('material_exchange_requests')
+          .select()
+          .order('created_at', ascending: false);
+      return rows.map((row) => MaterialExchangeRequest.fromJson(row)).toList();
+    }
+    final preferences = await SharedPreferences.getInstance();
+    return _readList(
+      preferences,
+      _exchangesKey,
+    ).map(MaterialExchangeRequest.fromJson).toList();
+  }
+
+  static Future<void> requestMaterialExchange({
+    required CompanyAccount account,
+    required MaterialListing listing,
+    required String offeredProduct,
+    String message = '',
+  }) async {
+    final row = {
+      'listing_id': listing.id,
+      'requester_company_id': _ownerId(account),
+      'requester_company_name': account.businessName,
+      'offered_product': offeredProduct,
+      'message': message,
+      'status': 'Pendiente',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    if (_cloud) {
+      await BackendConfig.client.from('material_exchange_requests').insert(row);
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final rows = _readList(preferences, _exchangesKey);
+    rows.insert(0, {
+      ...row,
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+    });
+    await preferences.setString(_exchangesKey, jsonEncode(rows));
+  }
+
+  static Future<void> updateExchangeStatus(
+    MaterialExchangeRequest request,
+    String status,
+  ) async {
+    if (_cloud) {
+      await BackendConfig.client
+          .from('material_exchange_requests')
+          .update({'status': status})
+          .eq('id', request.id);
+      if (status == 'Aceptada') {
+        await BackendConfig.client
+            .from('material_listings')
+            .update({'status': 'Reservado'})
+            .eq('id', request.listingId);
+        await BackendConfig.client
+            .from('material_exchange_requests')
+            .update({'status': 'Rechazada'})
+            .eq('listing_id', request.listingId)
+            .eq('status', 'Pendiente')
+            .neq('id', request.id);
+      }
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final requests = _readList(preferences, _exchangesKey);
+    for (final row in requests) {
+      if (row['id'] == request.id ||
+          (status == 'Aceptada' &&
+              row['listing_id'] == request.listingId &&
+              row['status'] == 'Pendiente')) {
+        row['status'] = row['id'] == request.id ? status : 'Rechazada';
+      }
+    }
+    await preferences.setString(_exchangesKey, jsonEncode(requests));
+    if (status == 'Aceptada') {
+      final listings = _readList(preferences, _materialsKey);
+      for (final row in listings) {
+        if (row['id'] == request.listingId) row['status'] = 'Reservado';
+      }
+      await preferences.setString(_materialsKey, jsonEncode(listings));
+    }
+  }
+
   static Future<List<LogisticsRequest>> loadRoutes() async {
     if (_cloud) {
       final rows = await BackendConfig.client
@@ -165,28 +253,114 @@ class WorkspaceRepository {
 
   static Future<void> requestRoute({
     required CompanyAccount account,
+    String origin = '',
     required String destination,
     required String deliveryType,
+    String cargoDescription = '',
+    DateTime? travelDate,
   }) async {
+    final row = {
+      'company_id': _ownerId(account),
+      'destination': destination,
+      'delivery_type': deliveryType,
+      'origin': origin,
+      'cargo_description': cargoDescription,
+      'travel_date': travelDate?.toIso8601String().split('T').first,
+      'status': 'Abierta',
+      'created_at': DateTime.now().toIso8601String(),
+    };
     if (_cloud) {
-      await BackendConfig.client.from('logistics_requests').insert({
-        'company_id': _ownerId(account),
-        'destination': destination,
-        'delivery_type': deliveryType,
-      });
+      await BackendConfig.client.from('logistics_requests').insert(row);
       return;
     }
     final preferences = await SharedPreferences.getInstance();
     final rows = _readList(preferences, _routesKey);
     rows.insert(0, {
       'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      ...row,
       'company_id': _ownerId(account),
       'company_name': account.businessName,
-      'destination': destination,
-      'delivery_type': deliveryType,
-      'created_at': DateTime.now().toIso8601String(),
     });
     await preferences.setString(_routesKey, jsonEncode(rows));
+  }
+
+  static Future<List<RouteJoinRequest>> loadRouteJoinRequests() async {
+    if (_cloud) {
+      final rows = await BackendConfig.client
+          .from('route_join_requests')
+          .select()
+          .order('created_at', ascending: false);
+      return rows.map((row) => RouteJoinRequest.fromJson(row)).toList();
+    }
+    final preferences = await SharedPreferences.getInstance();
+    return _readList(
+      preferences,
+      _routeJoinsKey,
+    ).map(RouteJoinRequest.fromJson).toList();
+  }
+
+  static Future<void> requestToJoinRoute({
+    required CompanyAccount account,
+    required LogisticsRequest route,
+    String message = '',
+  }) async {
+    final row = {
+      'route_id': route.id,
+      'requester_company_id': _ownerId(account),
+      'requester_company_name': account.businessName,
+      'message': message,
+      'status': 'Pendiente',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    if (_cloud) {
+      await BackendConfig.client.from('route_join_requests').insert(row);
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final requests = _readList(preferences, _routeJoinsKey);
+    requests.insert(0, {
+      ...row,
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+    });
+    await preferences.setString(_routeJoinsKey, jsonEncode(requests));
+  }
+
+  static Future<void> updateRouteJoinStatus(
+    RouteJoinRequest request,
+    String status,
+  ) async {
+    if (_cloud) {
+      await BackendConfig.client
+          .from('route_join_requests')
+          .update({'status': status})
+          .eq('id', request.id);
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final requests = _readList(preferences, _routeJoinsKey);
+    for (final row in requests) {
+      if (row['id'] == request.id) row['status'] = status;
+    }
+    await preferences.setString(_routeJoinsKey, jsonEncode(requests));
+  }
+
+  static Future<void> updateRouteStatus(
+    LogisticsRequest route,
+    String status,
+  ) async {
+    if (_cloud) {
+      await BackendConfig.client
+          .from('logistics_requests')
+          .update({'status': status})
+          .eq('id', route.id);
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final routes = _readList(preferences, _routesKey);
+    for (final row in routes) {
+      if (row['id'] == route.id) row['status'] = status;
+    }
+    await preferences.setString(_routesKey, jsonEncode(routes));
   }
 
   static List<Map<String, dynamic>> _readList(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../data/resource_catalog.dart';
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
 import '../../services/backend_config.dart';
@@ -19,6 +20,7 @@ class CircularWorkspaceScreen extends StatefulWidget {
 
 class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   List<MaterialListing> _listings = [];
+  List<MaterialExchangeRequest> _exchangeRequests = [];
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _quantityController = TextEditingController();
@@ -45,10 +47,15 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
 
   Future<void> _load() async {
     try {
-      final listings = await WorkspaceRepository.loadMaterials();
+      final results = await Future.wait([
+        WorkspaceRepository.loadMaterials(),
+        WorkspaceRepository.loadExchangeRequests(),
+      ]);
+      final listings = results[0] as List<MaterialListing>;
       if (!mounted) return;
       setState(() {
         _listings = listings;
+        _exchangeRequests = results[1] as List<MaterialExchangeRequest>;
         _loading = false;
         _error = null;
       });
@@ -67,6 +74,12 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     final description = _descriptionController..clear();
     final quantity = _quantityController..clear();
     final unit = _unitController..text = 'kg';
+    final exchangeFor = TextEditingController();
+    final customTitle = TextEditingController();
+    var category = ResourceCatalog.categories.first;
+    var product = ResourceCatalog.productsFor(category).first;
+    var otherProduct = false;
+    var status = 'Disponible';
     XFile? photo;
     final draft = await showDialog<_ListingDraft>(
       context: context,
@@ -81,6 +94,8 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                 children: [
                   TextFormField(
                     controller: title,
+                    readOnly: !otherProduct,
+                    textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
                       labelText: 'Nombre del material',
                     ),
@@ -88,6 +103,77 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                         ? 'Escribe el material'
                         : null,
                   ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: category,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Categoría'),
+                    items: ResourceCatalog.categories
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() {
+                        category = value;
+                        final products = ResourceCatalog.productsFor(value);
+                        product = products.isEmpty ? '' : products.first;
+                        otherProduct = products.isEmpty;
+                        title.text = otherProduct ? customTitle.text : product;
+                      });
+                    },
+                  ),
+                  if (ResourceCatalog.productsFor(category).isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: product,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Producto'),
+                      items: [
+                        ...ResourceCatalog.productsFor(category).map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value, overflow: TextOverflow.ellipsis),
+                          ),
+                        ),
+                        const DropdownMenuItem(
+                          value: '__other__',
+                          child: Text('Otro (escribir)'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          otherProduct = value == '__other__';
+                          product = otherProduct ? '' : value;
+                          title.text = otherProduct
+                              ? customTitle.text
+                              : product;
+                        });
+                      },
+                    ),
+                  ],
+                  if (otherProduct) ...[
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: customTitle,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Escribe el producto',
+                      ),
+                      onChanged: (value) => title.text = value,
+                      validator: (value) =>
+                          otherProduct &&
+                              (value == null || value.trim().isEmpty)
+                          ? 'Escribe el producto'
+                          : null,
+                    ),
+                  ],
+                  const SizedBox(height: 10),
                   TextFormField(
                     controller: description,
                     decoration: const InputDecoration(
@@ -95,6 +181,56 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                     ),
                     maxLines: 2,
                   ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: unit.text,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Unidad'),
+                    items: ResourceCatalog.units
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) unit.text = value;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: status,
+                    decoration: const InputDecoration(labelText: 'Modalidad'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Disponible',
+                        child: Text('Disponible para aprovechamiento'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Intercambio',
+                        child: Text('Disponible para intercambio'),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => status = value ?? 'Disponible'),
+                  ),
+                  if (status == 'Intercambio') ...[
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: exchangeFor,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: '¿Qué producto deseas recibir?',
+                      ),
+                      validator: (value) =>
+                          status == 'Intercambio' &&
+                              (value == null || value.trim().isEmpty)
+                          ? 'Indica qué deseas recibir'
+                          : null,
+                    ),
+                  ],
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
@@ -114,15 +250,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                                 ? 'Usa un valor mayor que cero'
                                 : null;
                           },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: unit,
-                          decoration: const InputDecoration(
-                            labelText: 'Unidad',
-                          ),
                         ),
                       ),
                     ],
@@ -179,7 +306,11 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                       description: description.text.trim(),
                       quantity: amount,
                       unit: unit.text.trim().isEmpty ? 'kg' : unit.text.trim(),
-                      status: 'Disponible',
+                      status: status,
+                      category: category,
+                      exchangeFor: status == 'Intercambio'
+                          ? exchangeFor.text.trim()
+                          : null,
                       companyName: widget.account.businessName,
                       city: widget.account.city,
                     ),
@@ -193,6 +324,8 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         ),
       ),
     );
+    exchangeFor.dispose();
+    customTitle.dispose();
     if (draft == null || !mounted) return;
 
     setState(() => _saving = true);
@@ -339,9 +472,276 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
             subtitle: 'Agrega un material para encontrar empresas interesadas.',
           )
         else
-          for (final item in visible) _MaterialCard(listing: item),
+          for (final item in visible) _buildMaterialCard(item),
       ],
     );
+  }
+
+  String get _companyId => widget.account.id.isNotEmpty
+      ? widget.account.id
+      : widget.account.email.toLowerCase();
+
+  Widget _buildMaterialCard(MaterialListing listing) {
+    final own = listing.companyId == _companyId;
+    final requests = _exchangeRequests
+        .where((request) => request.listingId == listing.id)
+        .toList();
+    final myRequests = requests
+        .where((request) => request.requesterCompanyId == _companyId)
+        .toList();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEBEFEA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _MaterialCard(listing: listing),
+          if (listing.exchangeFor?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Busca: ${listing.exchangeFor}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF39815D),
+                ),
+              ),
+            ),
+          if (own && requests.isNotEmpty) ...[
+            const Divider(height: 24),
+            const Text(
+              'Propuestas recibidas',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            for (final request in requests) _exchangeRequestTile(request),
+          ],
+          if (!own && listing.status == 'Intercambio' && myRequests.isEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _proposeExchange(listing),
+                icon: const Icon(Icons.swap_horiz),
+                label: const Text('Proponer intercambio'),
+              ),
+            ),
+          if (!own && myRequests.isNotEmpty)
+            for (final request in myRequests)
+              _exchangeRequestTile(request, allowCancel: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _exchangeRequestTile(
+    MaterialExchangeRequest request, {
+    bool allowCancel = false,
+  }) => Padding(
+    padding: const EdgeInsets.only(top: 9),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${request.requesterCompanyName} ofrece ${request.offeredProduct} · ${request.status}',
+          style: const TextStyle(fontSize: 12),
+        ),
+        if (request.message.isNotEmpty)
+          Text(request.message, style: const TextStyle(fontSize: 11)),
+        if (request.status == 'Pendiente' && allowCancel)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => _setExchangeStatus(request, 'Cancelada'),
+              child: const Text('Cancelar propuesta'),
+            ),
+          )
+        else if (request.status == 'Pendiente')
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: () => _setExchangeStatus(request, 'Rechazada'),
+                child: const Text('Rechazar'),
+              ),
+              FilledButton.tonal(
+                onPressed: () => _setExchangeStatus(request, 'Aceptada'),
+                child: const Text('Aceptar'),
+              ),
+            ],
+          ),
+      ],
+    ),
+  );
+
+  Future<void> _proposeExchange(MaterialListing listing) async {
+    final formKey = GlobalKey<FormState>();
+    final offered = TextEditingController();
+    final message = TextEditingController();
+    var category = ResourceCatalog.categories.first;
+    var product = ResourceCatalog.productsFor(category).first;
+    var custom = false;
+    final result = await showDialog<(String, String)?>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Proponer intercambio'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'La empresa busca: ${listing.exchangeFor ?? listing.title}',
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoría que ofreces',
+                  ),
+                  items: ResourceCatalog.categories
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(value, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() {
+                      category = value;
+                      final products = ResourceCatalog.productsFor(value);
+                      custom = products.isEmpty;
+                      product = products.isEmpty ? '' : products.first;
+                      offered.text = custom ? '' : product;
+                    });
+                  },
+                ),
+                if (ResourceCatalog.productsFor(category).isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: product,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Producto ofrecido',
+                    ),
+                    items: [
+                      ...ResourceCatalog.productsFor(category).map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(value, overflow: TextOverflow.ellipsis),
+                        ),
+                      ),
+                      const DropdownMenuItem(
+                        value: '__other__',
+                        child: Text('Otro (escribir)'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() {
+                        custom = value == '__other__';
+                        product = custom ? '' : value;
+                        offered.text = custom ? '' : value;
+                      });
+                    },
+                  ),
+                ],
+                if (custom) ...[
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: offered,
+                    decoration: const InputDecoration(
+                      labelText: 'Producto ofrecido',
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Escribe el producto'
+                        : null,
+                  ),
+                ],
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: message,
+                  decoration: const InputDecoration(
+                    labelText: 'Mensaje (opcional)',
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!custom) offered.text = product;
+                if (!formKey.currentState!.validate()) return;
+                Navigator.pop(dialogContext, (
+                  offered.text.trim(),
+                  message.text.trim(),
+                ));
+              },
+              child: const Text('Enviar propuesta'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) {
+      offered.dispose();
+      message.dispose();
+      return;
+    }
+    try {
+      await WorkspaceRepository.requestMaterialExchange(
+        account: widget.account,
+        listing: listing,
+        offeredProduct: result.$1,
+        message: result.$2,
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Propuesta enviada.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo enviar la propuesta.')),
+        );
+      }
+    } finally {
+      offered.dispose();
+      message.dispose();
+    }
+  }
+
+  Future<void> _setExchangeStatus(
+    MaterialExchangeRequest request,
+    String status,
+  ) async {
+    try {
+      await WorkspaceRepository.updateExchangeStatus(request, status);
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo actualizar el intercambio.'),
+          ),
+        );
+      }
+    }
   }
 }
 

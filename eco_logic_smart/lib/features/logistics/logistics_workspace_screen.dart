@@ -5,6 +5,7 @@ import '../../models/operational_records.dart';
 import '../../services/backend_config.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
+import '../../shared/colombian_city_field.dart';
 
 class LogisticsWorkspaceScreen extends StatefulWidget {
   const LogisticsWorkspaceScreen({super.key, required this.account});
@@ -18,6 +19,7 @@ class LogisticsWorkspaceScreen extends StatefulWidget {
 
 class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
   List<LogisticsRequest> _routes = [];
+  List<RouteJoinRequest> _joinRequests = [];
   final _destinationController = TextEditingController();
   bool _loading = true;
   bool _saving = false;
@@ -37,10 +39,15 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
 
   Future<void> _load() async {
     try {
-      final routes = await WorkspaceRepository.loadRoutes();
+      final results = await Future.wait([
+        WorkspaceRepository.loadRoutes(),
+        WorkspaceRepository.loadRouteJoinRequests(),
+      ]);
+      final routes = results[0] as List<LogisticsRequest>;
       if (!mounted) return;
       setState(() {
         _routes = routes;
+        _joinRequests = results[1] as List<RouteJoinRequest>;
         _loading = false;
         _error = null;
       });
@@ -55,71 +62,114 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
 
   Future<void> _requestRoute() async {
     final formKey = GlobalKey<FormState>();
-    final destination = _destinationController..clear();
+    String? origin;
+    String? destination;
+    final cargo = TextEditingController();
     var deliveryType = 'Materiales';
-    final result = await showDialog<(String, String)?>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Solicitar ruta'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: destination,
-                  decoration: const InputDecoration(
-                    labelText: 'Zona de destino',
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Escribe una zona de destino'
-                      : null,
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: deliveryType,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo de entrega',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Paquetes',
-                      child: Text('Paquetes'),
+    var travelDate = DateTime.now().add(const Duration(days: 1));
+    final result =
+        await showDialog<(String, String, String, String, DateTime)?>(
+          context: context,
+          builder: (dialogContext) => StatefulBuilder(
+            builder: (dialogContext, setDialogState) => AlertDialog(
+              title: const Text('Publicar una ruta compartida'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ColombianCityField(
+                      key: const ValueKey('route-origin'),
+                      onChanged: (value) => origin = value,
                     ),
-                    DropdownMenuItem(value: 'Insumos', child: Text('Insumos')),
-                    DropdownMenuItem(
-                      value: 'Materiales',
-                      child: Text('Materiales'),
+                    const SizedBox(height: 12),
+                    ColombianCityField(
+                      key: const ValueKey('route-destination'),
+                      onChanged: (value) => destination = value,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: deliveryType,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de entrega',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Paquetes',
+                          child: Text('Paquetes'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Insumos',
+                          child: Text('Insumos'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Materiales',
+                          child: Text('Materiales'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() => deliveryType = value);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: cargo,
+                      decoration: const InputDecoration(
+                        labelText: 'Carga o capacidad disponible',
+                        hintText: 'Ej. 2 toneladas de cartón',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Describe la carga o capacidad'
+                          : null,
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final selected = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: travelDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
+                        );
+                        if (selected != null) {
+                          setDialogState(() => travelDate = selected);
+                        }
+                      },
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: Text('Fecha: ${_dateLabel(travelDate)}'),
                     ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => deliveryType = value);
-                    }
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    if (origin == null || destination == null) return;
+                    Navigator.pop(dialogContext, (
+                      origin!,
+                      destination!,
+                      deliveryType,
+                      cargo.text.trim(),
+                      travelDate,
+                    ));
                   },
+                  child: const Text('Enviar solicitud'),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                Navigator.pop(dialogContext, (
-                  destination.text.trim(),
-                  deliveryType,
-                ));
-              },
-              child: const Text('Enviar solicitud'),
-            ),
-          ],
-        ),
-      ),
-    );
+        );
+    cargo.dispose();
     if (result == null || !mounted) {
       return;
     }
@@ -127,8 +177,11 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
     try {
       await WorkspaceRepository.requestRoute(
         account: widget.account,
-        destination: result.$1,
-        deliveryType: result.$2,
+        origin: result.$1,
+        destination: result.$2,
+        deliveryType: result.$3,
+        cargoDescription: result.$4,
+        travelDate: result.$5,
       );
       await _load();
       if (mounted) {
@@ -235,16 +288,7 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             color: Color(0xFFFFF0DF),
           )
         else
-          for (final route in _routes)
-            InfoCard(
-              icon: Icons.local_shipping_outlined,
-              title: route.destination,
-              subtitle: '${route.companyName} · ${route.deliveryType}',
-              trailing: _sameDestinationCount(route) > 1
-                  ? 'Coincide'
-                  : 'Abierta',
-              color: const Color(0xFFFFF0DF),
-            ),
+          for (final route in _routes) _routeCard(route),
         const SizedBox(height: 12),
         const SectionTitle('Cómo funciona'),
         const _StepLine(
@@ -270,6 +314,202 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             item.destination.trim().toLowerCase(),
       )
       .length;
+
+  String get _companyId => widget.account.id.isNotEmpty
+      ? widget.account.id
+      : widget.account.email.toLowerCase();
+
+  Widget _routeCard(LogisticsRequest route) {
+    final own = route.companyId == _companyId;
+    final requests = _joinRequests
+        .where((request) => request.routeId == route.id)
+        .toList();
+    final mine = requests
+        .where((request) => request.requesterCompanyId == _companyId)
+        .toList();
+    final date = route.travelDate == null
+        ? ''
+        : ' · ${_dateLabel(route.travelDate!)}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF9F0),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF0E6D6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.route_outlined, color: Color(0xFF9B6A32)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${route.origin.isEmpty ? 'Origen pendiente' : route.origin} → ${route.destination}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (_sameDestinationCount(route) > 1)
+                const Chip(
+                  label: Text('Coincide', style: TextStyle(fontSize: 10)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${route.companyName} · ${route.deliveryType}$date',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF59665D)),
+          ),
+          if (route.cargoDescription.isNotEmpty)
+            Text(
+              'Carga/capacidad: ${route.cargoDescription}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          Text(
+            'Estado: ${route.status}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          if (own &&
+              route.status != 'Completada' &&
+              route.status != 'Cancelada')
+            Wrap(
+              spacing: 6,
+              children: [
+                if (route.status == 'Abierta')
+                  TextButton(
+                    onPressed: () => _setRouteStatus(route, 'En coordinación'),
+                    child: const Text('Iniciar coordinación'),
+                  ),
+                if (route.status == 'En coordinación')
+                  FilledButton.tonal(
+                    onPressed: () => _setRouteStatus(route, 'Completada'),
+                    child: const Text('Marcar completada'),
+                  ),
+                TextButton(
+                  onPressed: () => _setRouteStatus(route, 'Cancelada'),
+                  child: const Text('Cancelar ruta'),
+                ),
+              ],
+            ),
+          if (!own && route.status == 'Abierta' && mine.isEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _joinRoute(route),
+                icon: const Icon(Icons.group_add_outlined),
+                label: const Text('Solicitar unirme'),
+              ),
+            ),
+          if (!own && mine.isNotEmpty)
+            for (final request in mine)
+              _joinRequestTile(request, allowCancel: true),
+          if (own && requests.isNotEmpty) ...[
+            const Divider(),
+            const Text(
+              'Empresas interesadas',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            for (final request in requests) _joinRequestTile(request),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _joinRequestTile(
+    RouteJoinRequest request, {
+    bool allowCancel = false,
+  }) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            '${request.requesterCompanyName} · ${request.status}',
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+        if (request.status == 'Pendiente' && allowCancel)
+          TextButton(
+            onPressed: () => _setJoinStatus(request, 'Cancelada'),
+            child: const Text('Cancelar'),
+          )
+        else if (request.status == 'Pendiente') ...[
+          TextButton(
+            onPressed: () => _setJoinStatus(request, 'Rechazada'),
+            child: const Text('Rechazar'),
+          ),
+          TextButton(
+            onPressed: () => _setJoinStatus(request, 'Aceptada'),
+            child: const Text('Aceptar'),
+          ),
+        ],
+      ],
+    ),
+  );
+
+  Future<void> _joinRoute(LogisticsRequest route) async {
+    try {
+      await WorkspaceRepository.requestToJoinRoute(
+        account: widget.account,
+        route: route,
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Solicitud enviada a la empresa.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo solicitar unirse a esta ruta.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _setJoinStatus(RouteJoinRequest request, String status) async {
+    try {
+      await WorkspaceRepository.updateRouteJoinStatus(request, status);
+      if (status == 'Aceptada') {
+        final matches = _routes.where((item) => item.id == request.routeId);
+        if (matches.isNotEmpty) {
+          await WorkspaceRepository.updateRouteStatus(
+            matches.first,
+            'En coordinación',
+          );
+        }
+      }
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo actualizar la solicitud.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _setRouteStatus(LogisticsRequest route, String status) async {
+    try {
+      await WorkspaceRepository.updateRouteStatus(route, status);
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo actualizar la ruta.')),
+        );
+      }
+    }
+  }
+
+  String _dateLabel(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
 
 class _StepLine extends StatelessWidget {

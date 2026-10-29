@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../app_shell.dart';
 import '../../models/company_account.dart';
 import '../../services/account_repository.dart';
+import '../../shared/colombian_city_field.dart';
 
 class CompanyRegistrationScreen extends StatefulWidget {
   const CompanyRegistrationScreen({super.key});
@@ -18,7 +19,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
   final _business = TextEditingController();
   final _contact = TextEditingController();
   final _email = TextEditingController();
-  final _location = TextEditingController();
+  String? _location;
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
   String _sector = 'Turismo y hotelería';
@@ -30,7 +31,6 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
     _business.dispose();
     _contact.dispose();
     _email.dispose();
-    _location.dispose();
     _password.dispose();
     _confirmPassword.dispose();
     super.dispose();
@@ -43,7 +43,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
       contactName: _contact.text.trim(),
       email: _email.text.trim().toLowerCase(),
       sector: _sector,
-      city: _location.text.trim(),
+      city: _location ?? '',
     );
     setState(() => _isRegistering = true);
     try {
@@ -194,15 +194,9 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
               },
             ),
             const SizedBox(height: 14),
-            TextFormField(
-              controller: _location,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Ciudad o zona',
-                prefixIcon: Icon(Icons.location_on_outlined),
-                border: OutlineInputBorder(),
-              ),
-              validator: _required('Ingresa la ciudad o zona'),
+            ColombianCityField(
+              key: const ValueKey('company-registration-city'),
+              onChanged: (city) => setState(() => _location = city),
             ),
             const SizedBox(height: 14),
             TextFormField(
