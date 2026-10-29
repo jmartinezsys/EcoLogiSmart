@@ -374,6 +374,17 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         icon: const Icon(Icons.add),
       ),
       children: [
+        if (BackendConfig.isInitialized &&
+            !WorkspaceRepository.hasExchangeSchema) ...[
+          const InfoCard(
+            icon: Icons.warning_amber_rounded,
+            title: 'Falta actualizar el esquema de Supabase',
+            subtitle:
+                'Las publicaciones ya se pueden consultar. Para enviar, aceptar o cancelar intercambios, ejecuta la migración marketplace_and_routes en el SQL Editor de Supabase.',
+            color: Color(0xFFFFF0DF),
+          ),
+          const SizedBox(height: 12),
+        ],
         InfoCard(
           icon: BackendConfig.isInitialized
               ? Icons.cloud_done_outlined

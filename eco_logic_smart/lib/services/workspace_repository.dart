@@ -17,6 +17,12 @@ class WorkspaceRepository {
   static const _exchangesKey = 'ecologismart.demo.exchanges.v1';
   static const _routeJoinsKey = 'ecologismart.demo.route_joins.v1';
   static const _bucket = 'material-images';
+  static final _missingSchemaTables = <String>{};
+
+  static bool get hasExchangeSchema =>
+      !_missingSchemaTables.contains('material_exchange_requests');
+  static bool get hasRouteSharingSchema =>
+      !_missingSchemaTables.contains('route_join_requests');
 
   static bool get _cloud => BackendConfig.isRequested;
   static String _ownerId(CompanyAccount account) => _cloud
@@ -152,11 +158,22 @@ class WorkspaceRepository {
 
   static Future<List<MaterialExchangeRequest>> loadExchangeRequests() async {
     if (_cloud) {
-      final rows = await BackendConfig.client
-          .from('material_exchange_requests')
-          .select()
-          .order('created_at', ascending: false);
-      return rows.map((row) => MaterialExchangeRequest.fromJson(row)).toList();
+      try {
+        final rows = await BackendConfig.client
+            .from('material_exchange_requests')
+            .select()
+            .order('created_at', ascending: false);
+        _missingSchemaTables.remove('material_exchange_requests');
+        return rows
+            .map((row) => MaterialExchangeRequest.fromJson(row))
+            .toList();
+      } on PostgrestException catch (error) {
+        if (error.code == 'PGRST205' || error.code == '42P01') {
+          _missingSchemaTables.add('material_exchange_requests');
+          return [];
+        }
+        rethrow;
+      }
     }
     final preferences = await SharedPreferences.getInstance();
     return _readList(
@@ -286,11 +303,20 @@ class WorkspaceRepository {
 
   static Future<List<RouteJoinRequest>> loadRouteJoinRequests() async {
     if (_cloud) {
-      final rows = await BackendConfig.client
-          .from('route_join_requests')
-          .select()
-          .order('created_at', ascending: false);
-      return rows.map((row) => RouteJoinRequest.fromJson(row)).toList();
+      try {
+        final rows = await BackendConfig.client
+            .from('route_join_requests')
+            .select()
+            .order('created_at', ascending: false);
+        _missingSchemaTables.remove('route_join_requests');
+        return rows.map((row) => RouteJoinRequest.fromJson(row)).toList();
+      } on PostgrestException catch (error) {
+        if (error.code == 'PGRST205' || error.code == '42P01') {
+          _missingSchemaTables.add('route_join_requests');
+          return [];
+        }
+        rethrow;
+      }
     }
     final preferences = await SharedPreferences.getInstance();
     return _readList(

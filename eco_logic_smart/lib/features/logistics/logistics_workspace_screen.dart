@@ -219,6 +219,17 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
         icon: const Icon(Icons.add_road),
       ),
       children: [
+        if (BackendConfig.isInitialized &&
+            !WorkspaceRepository.hasRouteSharingSchema) ...[
+          const InfoCard(
+            icon: Icons.warning_amber_rounded,
+            title: 'Falta actualizar el esquema de Supabase',
+            subtitle:
+                'Puedes consultar las rutas existentes. Para solicitar unirse y responder solicitudes, ejecuta la migración marketplace_and_routes en el SQL Editor de Supabase.',
+            color: Color(0xFFFFF0DF),
+          ),
+          const SizedBox(height: 12),
+        ],
         InfoCard(
           icon: BackendConfig.isInitialized
               ? Icons.cloud_done_outlined
