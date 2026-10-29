@@ -47,6 +47,60 @@ class WorkspaceRepository {
     ).map(InventoryItem.fromJson).toList();
   }
 
+  static Future<List<InventoryItem>> loadRecoverableLocalInventory(
+    CompanyAccount account,
+  ) async {
+    if (!_cloud) return const [];
+    final preferences = await SharedPreferences.getInstance();
+    final email = account.email.trim().toLowerCase();
+    final legacyIds = {email, if (account.id.isNotEmpty) account.id};
+    final importedKey =
+        'ecologismart.inventory.imported.v1.${_ownerId(account)}';
+    if (preferences.getBool(importedKey) == true) return const [];
+
+    final matchingKeys = preferences.getKeys().where((key) {
+      if (!key.startsWith(_inventoryPrefix)) return false;
+      final owner = key.substring(_inventoryPrefix.length);
+      return legacyIds.any((id) => id.toLowerCase() == owner.toLowerCase());
+    });
+    final rows = <Map<String, dynamic>>[];
+    for (final key in matchingKeys) {
+      rows.addAll(_readList(preferences, key));
+    }
+    return rows.map(InventoryItem.fromJson).toList();
+  }
+
+  static Future<int> importRecoverableInventory({
+    required CompanyAccount account,
+    required List<InventoryItem> localItems,
+    required List<InventoryItem> currentItems,
+  }) async {
+    if (!_cloud) {
+      throw StateError(
+        'La importación requiere una cuenta conectada a Supabase.',
+      );
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final importedKey =
+        'ecologismart.inventory.imported.v1.${_ownerId(account)}';
+    if (preferences.getBool(importedKey) == true) return 0;
+
+    final knownItems = currentItems.map(_inventorySignature).toSet();
+    final newItems = localItems
+        .where((item) => knownItems.add(_inventorySignature(item)))
+        .map((item) => {...item.toJson(), 'company_id': _ownerId(account)})
+        .toList();
+    if (newItems.isNotEmpty) {
+      await BackendConfig.client.from('inventory_items').insert(newItems);
+    }
+    await preferences.setBool(importedKey, true);
+    return newItems.length;
+  }
+
+  static String _inventorySignature(InventoryItem item) =>
+      '${item.name.trim().toLowerCase()}|${item.category.trim().toLowerCase()}|'
+      '${item.quantity}|${item.unit.trim().toLowerCase()}|${item.lowStockThreshold}';
+
   static Future<void> saveInventory(
     CompanyAccount account,
     InventoryItem item,

@@ -7,16 +7,19 @@ import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 
 class ResourcesScreen extends StatefulWidget {
-  const ResourcesScreen({super.key, required this.account});
+  const ResourcesScreen({super.key, required this.account, this.onNavigate});
   final CompanyAccount account;
+  final ValueChanged<int>? onNavigate;
   @override
   State<ResourcesScreen> createState() => _ResourcesScreenState();
 }
 
 class _ResourcesScreenState extends State<ResourcesScreen> {
   List<InventoryItem> _items = [];
+  List<InventoryItem> _recoverableItems = [];
   bool _loading = true;
   bool _saving = false;
+  bool _importing = false;
   String? _error;
   String _query = '';
 
@@ -29,9 +32,14 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   Future<void> _loadItems() async {
     try {
       final items = await WorkspaceRepository.loadInventory(widget.account);
+      final recoverable =
+          await WorkspaceRepository.loadRecoverableLocalInventory(
+            widget.account,
+          );
       if (!mounted) return;
       setState(() {
         _items = items;
+        _recoverableItems = recoverable;
         _loading = false;
         _error = null;
       });
@@ -41,6 +49,61 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         _loading = false;
         _error = 'No se pudo cargar el inventario. Revisa tu conexión.';
       });
+    }
+  }
+
+  Future<void> _importRecoverableInventory() async {
+    final count = _recoverableItems.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Recuperar productos locales'),
+        content: Text(
+          'Se copiarán $count productos guardados en este dispositivo al inventario en la nube de ${widget.account.businessName}. La copia local se conservará.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Ahora no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Copiar al inventario'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _importing = true);
+    try {
+      final imported = await WorkspaceRepository.importRecoverableInventory(
+        account: widget.account,
+        localItems: _recoverableItems,
+        currentItems: _items,
+      );
+      await _loadItems();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              imported == 0
+                  ? 'Los productos ya estaban en el inventario.'
+                  : 'Se recuperaron $imported productos.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudieron copiar los productos locales.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
     }
   }
 
@@ -88,6 +151,47 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         icon: const Icon(Icons.add),
       ),
       children: [
+        if (_recoverableItems.isNotEmpty) ...[
+          InfoCard(
+            icon: Icons.cloud_upload_outlined,
+            title:
+                'Encontramos ${_recoverableItems.length} productos en este dispositivo',
+            subtitle:
+                'Pueden ser los productos registrados antes de conectar la cuenta a la nube. Cópialos al inventario de esta empresa para verlos desde tus otros dispositivos.',
+            color: const Color(0xFFEAF0F8),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonalIcon(
+              onPressed: _importing ? null : _importRecoverableInventory,
+              icon: _importing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cloud_upload_outlined),
+              label: Text(_importing ? 'Copiando…' : 'Recuperar productos'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        InfoCard(
+          icon: Icons.lock_outline,
+          title: 'Inventario privado de ${widget.account.businessName}',
+          subtitle:
+              'Aquí ves los recursos de esta empresa. Para consultar productos que otras empresas publicaron para compartir, entra a Economía circular.',
+          color: const Color(0xFFEAF0F8),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => widget.onNavigate?.call(2),
+            icon: const Icon(Icons.recycling_outlined),
+            label: const Text('Ver productos compartidos'),
+          ),
+        ),
         Row(
           children: [
             Expanded(

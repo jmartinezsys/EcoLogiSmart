@@ -46,6 +46,7 @@ class _AppShellState extends State<AppShell> {
       ResourcesScreen(
         key: ValueKey('resources-${_refreshVersions[1]}'),
         account: _account,
+        onNavigate: _selectTab,
       ),
       CircularWorkspaceScreen(
         key: ValueKey('circular-${_refreshVersions[2]}'),

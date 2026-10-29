@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
+import '../../services/account_repository.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
+import '../auth/splash_screen.dart';
 import '../company/company_screen.dart';
 import '../diagnosis/diagnosis_workspace_screen.dart';
 
@@ -85,16 +87,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Quieres salir de la cuenta de esta empresa?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await AccountRepository.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final firstName = _account.contactName.trim().split(RegExp(r'\s+')).first;
     return PageFrame(
       title: 'Hola, $firstName',
       subtitle: 'Este es el espacio de ${_account.businessName}.',
-      action: IconButton.filledTonal(
-        tooltip: 'Perfil de empresa',
-        onPressed: () => _openProfile(context),
-        icon: const Icon(Icons.person_outline),
+      action: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton.filledTonal(
+            tooltip: 'Perfil de empresa',
+            onPressed: () => _openProfile(context),
+            icon: const Icon(Icons.person_outline),
+          ),
+          IconButton(
+            tooltip: 'Cerrar sesión',
+            onPressed: _signOut,
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
       ),
       children: [
         ClipRRect(

@@ -43,6 +43,33 @@ class _CompanyScreenState extends State<CompanyScreen> {
     if (mounted) Navigator.pop(context, updated);
   }
 
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Quieres salir de la cuenta de esta empresa?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await AccountRepository.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -54,14 +81,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
       actions: [
         IconButton(
           tooltip: 'Cerrar sesión',
-          onPressed: () async {
-            await AccountRepository.signOut();
-            if (!context.mounted) return;
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
-              (route) => false,
-            );
-          },
+          onPressed: _signOut,
           icon: const Icon(Icons.logout_rounded),
         ),
       ],
@@ -180,6 +200,18 @@ class _CompanyScreenState extends State<CompanyScreen> {
               label: const Text('Guardar perfil'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _signOut,
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Cerrar sesión de esta empresa'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF8A3028),
+                side: const BorderSide(color: Color(0xFFE6B8B3)),
               ),
             ),
           ],
