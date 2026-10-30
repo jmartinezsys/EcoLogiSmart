@@ -278,3 +278,6 @@ create policy "Companies update own route requests"
   using (company_id = (select auth.uid()))
   with check (company_id = (select auth.uid()));
 grant update (status) on public.logistics_requests to authenticated;
+
+-- Refresh PostgREST after adding columns used by the mobile and web clients.
+notify pgrst, 'reload schema';

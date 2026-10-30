@@ -236,7 +236,11 @@ class WorkspaceRepository {
       try {
         final rows = await BackendConfig.client
             .from('material_exchange_requests')
-            .select('*,offered_quantity,offered_unit')
+            .select(
+              'id,listing_id,requester_company_id,requester_company_name,'
+              'offered_product,offered_quantity,offered_unit,message,status,'
+              'created_at,updated_at',
+            )
             .order('created_at', ascending: false);
         _missingSchemaTables.remove('material_exchange_requests');
         return rows
