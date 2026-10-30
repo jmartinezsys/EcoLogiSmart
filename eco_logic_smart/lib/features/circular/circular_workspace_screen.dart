@@ -361,6 +361,15 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     final visible = _listings
         .where((item) => _filter == 'Todos' || item.status == _filter)
         .toList();
+    final incomingExchanges = _exchangeRequests.where((request) {
+      return _listings.any(
+        (listing) =>
+            listing.id == request.listingId && listing.companyId == _companyId,
+      );
+    }).toList();
+    final outgoingExchanges = _exchangeRequests
+        .where((request) => request.requesterCompanyId == _companyId)
+        .toList();
     final totalQuantity = _listings.fold<double>(
       0,
       (total, listing) => total + listing.quantity,
@@ -378,10 +387,18 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
             !WorkspaceRepository.hasExchangeSchema) ...[
           const InfoCard(
             icon: Icons.warning_amber_rounded,
-            title: 'Falta actualizar el esquema de Supabase',
+            title: 'Falta activar los intercambios en Supabase',
             subtitle:
-                'Las publicaciones ya se pueden consultar. Para enviar, aceptar o cancelar intercambios, ejecuta la migración marketplace_and_routes en el SQL Editor de Supabase.',
+                'En el SQL Editor ejecuta la migración 20261029000000_marketplace_and_routes.sql. Después vuelve a comprobar la conexión.',
             color: Color(0xFFFFF0DF),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Comprobar'),
+            ),
           ),
           const SizedBox(height: 12),
         ],
@@ -465,6 +482,30 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
           ],
         ),
         const SizedBox(height: 22),
+        const SectionTitle('Intercambios'),
+        const InfoCard(
+          icon: Icons.swap_horiz,
+          title: 'Propón un producto y recibe una respuesta',
+          subtitle:
+              'En una publicación de intercambio puedes ofrecer un producto. La empresa que publicó decide si acepta o rechaza; puedes cancelar mientras siga pendiente.',
+          color: Color(0xFFEAF4EC),
+        ),
+        const SizedBox(height: 12),
+        _exchangeInbox(
+          title: 'Propuestas recibidas',
+          requests: incomingExchanges,
+          emptyMessage:
+              'Aún no hay propuestas. Publica un material en modalidad Intercambio para recibir ofertas de otras empresas.',
+        ),
+        const SizedBox(height: 10),
+        _exchangeInbox(
+          title: 'Propuestas enviadas',
+          requests: outgoingExchanges,
+          emptyMessage:
+              'Aquí verás el estado de las propuestas que envíes a otras empresas.',
+          outgoing: true,
+        ),
+        const SizedBox(height: 22),
         const SectionTitle('Materiales publicados'),
         Wrap(
           spacing: 8,
@@ -503,6 +544,45 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
       ? widget.account.id
       : widget.account.email.toLowerCase();
 
+  Widget _exchangeInbox({
+    required String title,
+    required List<MaterialExchangeRequest> requests,
+    required String emptyMessage,
+    bool outgoing = false,
+  }) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFEBEFEA)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        if (requests.isEmpty)
+          Text(
+            emptyMessage,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF65736A)),
+          )
+        else
+          for (final request in requests) ...[
+            if (request != requests.first) const Divider(height: 20),
+            _exchangeRequestTile(
+              request,
+              allowCancel: outgoing,
+              listingTitle: _listings
+                  .where((listing) => listing.id == request.listingId)
+                  .map((listing) => listing.title)
+                  .firstOrNull,
+            ),
+          ],
+      ],
+    ),
+  );
+
   Widget _buildMaterialCard(MaterialListing listing) {
     final own = listing.companyId == _companyId;
     final requests = _exchangeRequests
@@ -534,14 +614,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                 ),
               ),
             ),
-          if (own && requests.isNotEmpty) ...[
-            const Divider(height: 24),
-            const Text(
-              'Propuestas recibidas',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            for (final request in requests) _exchangeRequestTile(request),
-          ],
           if (!own && listing.status == 'Intercambio' && myRequests.isEmpty)
             Align(
               alignment: Alignment.centerRight,
@@ -568,11 +640,22 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   Widget _exchangeRequestTile(
     MaterialExchangeRequest request, {
     bool allowCancel = false,
+    String? listingTitle,
   }) => Padding(
     padding: const EdgeInsets.only(top: 9),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (listingTitle != null)
+          Text(
+            'Material: $listingTitle',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          )
+        else if (allowCancel)
+          const Text(
+            'El material ya no está disponible en el catálogo.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
+          ),
         Text(
           '${request.requesterCompanyName} ofrece ${request.offeredProduct} · ${request.status}',
           style: const TextStyle(fontSize: 12),
