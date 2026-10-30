@@ -10,6 +10,8 @@ alter table public.logistics_requests
 
 drop policy if exists "Authenticated users view available materials"
   on public.material_listings;
+drop policy if exists "Companies view own and available materials"
+  on public.material_listings;
 create policy "Companies view own and available materials"
   on public.material_listings for select to authenticated
   using (
@@ -18,6 +20,8 @@ create policy "Companies view own and available materials"
   );
 
 drop policy if exists "Authenticated users view open routes"
+  on public.logistics_requests;
+drop policy if exists "Companies view own and open routes"
   on public.logistics_requests;
 create policy "Companies view own and open routes"
   on public.logistics_requests for select to authenticated
