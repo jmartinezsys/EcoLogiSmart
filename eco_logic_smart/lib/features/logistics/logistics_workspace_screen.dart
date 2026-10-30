@@ -355,6 +355,12 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
     final mine = requests
         .where((request) => request.requesterCompanyId == _companyId)
         .toList();
+    final activeMine = mine
+        .where(
+          (request) =>
+              request.status == 'Pendiente' || request.status == 'Aceptada',
+        )
+        .toList();
     final date = route.travelDate == null
         ? ''
         : ' · ${_dateLabel(route.travelDate!)}';
@@ -421,7 +427,7 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                 ),
               ],
             ),
-          if (!own && route.status == 'Abierta' && mine.isEmpty)
+          if (!own && route.status == 'Abierta' && activeMine.isEmpty)
             Align(
               alignment: Alignment.centerRight,
               child:
