@@ -4,6 +4,8 @@ EcoLogiSmart es un prototipo de plataforma digital para pequeñas y medianas emp
 
 La descripción del proyecto, su alcance, el plan de trabajo del grupo y los indicadores propuestos están consolidados en la [documentación del proyecto](documentacion_proyecto.md). El [informe de cambios](informe_general.md) resume el historial de commits.
 
+El [guion de sustentación en PDF](output/pdf/guion_sustentacion_ecologismart.pdf) está preparado para compartir y exponer en cuatro partes. También está disponible su [versión editable](guion_sustentacion.md).
+
 ## Propósito
 
 La plataforma busca facilitar decisiones operativas y promover la economía circular y la logística compartida, sin solicitar información financiera privada como ingresos, cuentas bancarias o estados financieros.
@@ -12,9 +14,9 @@ La plataforma busca facilitar decisiones operativas y promover la economía circ
 
 - Acceso y perfil de empresa.
 - Inventario por empresa y alertas de existencias mínimas.
-- Publicaciones de materiales aprovechables con fotografía.
-- Solicitudes logísticas y detección básica de destinos coincidentes.
-- Diagnóstico e indicadores calculados a partir de los registros disponibles.
+- Publicaciones de materiales para aprovechamiento o intercambio, con fotografía y respuesta a propuestas.
+- Rutas con origen, destino, carga y fecha; solicitudes para unirse y seguimiento de su estado.
+- Diagnóstico e indicadores de actividad calculados a partir de los registros disponibles.
 
 ## Aplicación
 
@@ -82,4 +84,4 @@ eco_logic_smart/lib/
 
 ## Alcance
 
-El proyecto está preparado para operar con varias empresas en Supabase, pero la sincronización requiere un proyecto real y la aplicación de la migración. La clave secreta del backend no se incluye en la aplicación. El modo local permite presentar y probar los flujos en un dispositivo, pero no sustituye un entorno de producción.
+El proyecto está preparado para operar con varias empresas en Supabase, pero la sincronización de los perfiles y operaciones requiere un proyecto real y la aplicación de las migraciones. Las coincidencias de destinos son una ayuda para coordinar, no un sistema de optimización automática de rutas. Los indicadores muestran actividad registrada y no calculan ahorros o impacto ambiental medido. El modo local permite presentar y probar los flujos en un dispositivo, pero no sincroniza la información entre empresas.

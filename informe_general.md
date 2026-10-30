@@ -1,18 +1,46 @@
 # Informe general de cambios del sistema
 
-Desde su creación, EcoLogiSmart pasó de una estructura inicial en Flutter a un prototipo con registro de empresas, módulos operativos e integración configurable con Supabase. Las fechas y horas corresponden a Colombia (UTC-05:00), y los cambios aparecen en orden cronológico inverso.
+Desde su creación, EcoLogiSmart pasó de una estructura inicial en Flutter a una aplicación web publicada y un prototipo móvil con registro de empresas, inventario, intercambio de materiales y rutas compartidas. Las fechas y horas corresponden a Colombia (UTC-05:00), y los cambios aparecen en orden cronológico inverso.
+
+## 28 de octubre de 2026
+
+### 23:19:38 — `3aa9164` — Cierre de sesión y recuperación del inventario local
+
+Se facilitaron el cierre de sesión y la revisión de la cuenta desde el tablero y el perfil empresarial. También se añadió una opción para recuperar productos que se habían guardado localmente antes de conectar la cuenta con el inventario en la nube.
+
+### 23:05:32 — `5cbc811` — Compatibilidad de publicaciones con la migración de Supabase
+
+Se ajustó la aplicación para mostrar las publicaciones aunque la base de datos todavía no tenga habilitadas las funciones de intercambio. La pantalla informa cuándo hace falta actualizar la configuración del servicio.
+
+### 22:34:06 — `a9abd1f` — Intercambios de materiales y rutas compartidas
+
+Se añadieron categorías para recursos, selección de ciudades colombianas, publicaciones para aprovechamiento o intercambio, propuestas entre empresas y solicitudes para unirse a rutas. Se incorporó una segunda migración para guardar intercambios, solicitudes de ruta y sus estados.
+
+## 26 de octubre de 2026
+
+### 00:07:34 — `91997f5` — Ajustes de carga y formularios empresariales
+
+Se corrigieron detalles de carga en el tablero y los formularios, se ajustó la navegación y se ampliaron las pruebas de la aplicación.
 
 ## 25 de octubre de 2026
 
+### 22:45:41 — `e9f9ecb` — Actualización de documentación e inicio web
+
+Se revisaron las guías del proyecto y se mejoró la pantalla de inicio web para mostrar el estado de carga y ofrecer reintento si la aplicación no inicia.
+
 ### 22:36:42 — `45e561e` — Mejora visual de la aplicación móvil
 
-La interfaz recibió un tema visual más uniforme, con ajustes en colores, tipografía, campos y botones. El tablero ahora presenta el perfil de la empresa en una tarjeta con su identidad gráfica y adapta el contenido a distintos tamaños. El inventario calcula sus categorías a partir de los productos registrados y reemplaza los consumos de agua y energía de ejemplo por una indicación para mantener las existencias actualizadas.
+La interfaz recibió un tema visual más uniforme, con ajustes en colores, tipografía, campos y botones. El tablero presenta el perfil de la empresa con su identidad gráfica y adapta el contenido a distintos tamaños. El inventario calcula sus categorías a partir de los productos registrados y reemplaza consumos de agua y energía de ejemplo por una indicación para mantener las existencias actualizadas.
 
 ### 22:18:53 — `52847e5` — Integración de Supabase y persistencia para los módulos empresariales
 
 La aplicación incorporó autenticación con correo y contraseña, recuperación de contraseña y restauración de sesión. Los perfiles de empresa, el inventario, las publicaciones de materiales y las solicitudes logísticas pueden conectarse a Supabase; cuando no hay configuración de nube, el prototipo conserva un modo de demostración local.
 
-También se incorporaron repositorios para cuentas y operaciones, modelos de datos, pantallas de diagnóstico e indicadores, y flujos de economía circular y logística. Una migración SQL define perfiles, inventario, publicaciones, solicitudes, políticas de seguridad por fila (RLS) y almacenamiento de imágenes. La integración requiere configurar un proyecto Supabase y aplicar la migración; el repositorio no incluye un servicio Supabase desplegado.
+También se incorporaron repositorios para cuentas y operaciones, modelos de datos, pantallas de diagnóstico e indicadores, y flujos de economía circular y logística. Una migración SQL define perfiles, inventario, publicaciones, solicitudes, políticas de seguridad por fila (RLS) y almacenamiento de imágenes. La integración compartida requiere un proyecto Supabase configurado y sus migraciones aplicadas.
+
+### 17:08:26 — `149140f` — Publicación de la aplicación web
+
+Se configuró la publicación automática de la versión web en GitHub Pages y se mejoró la presentación del tablero. La aplicación quedó disponible en [jmartinezsys.github.io/EcoLogiSmart](https://jmartinezsys.github.io/EcoLogiSmart/).
 
 ## 24 de octubre de 2026
 
@@ -39,7 +67,3 @@ Se creó la estructura inicial de Flutter, con configuración de análisis, depe
 ### 06:36:57 — `7cd402b` — Inicio del repositorio
 
 Se inició el repositorio con un README básico.
-
-## Cambios locales sin commit
-
-Los cambios locales actuales ajustan el inicio de la versión web. La pantalla de carga muestra un mensaje y ofrece reintentar si la aplicación falla o tarda más de 45 segundos en abrir. Estos cambios todavía no aparecen en el historial de commits.

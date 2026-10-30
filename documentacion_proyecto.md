@@ -34,15 +34,25 @@ Para ello, la propuesta reúne tres funciones que suelen gestionarse por separad
 
 ## Aplicación desarrollada
 
-La aplicación Flutter incluye acceso y registro de empresas, perfil empresarial, tablero, diagnóstico, inventario, publicaciones de materiales, solicitudes logísticas e indicadores. Las cuentas admiten inicio y recuperación de contraseña. El tablero y los indicadores presentan información derivada de los registros disponibles; las cifras de impacto siguen siendo estimaciones cuando los datos reales aún no se han registrado.
+La aplicación está disponible en [su versión web](https://jmartinezsys.github.io/EcoLogiSmart/) y también se ejecuta en dispositivos móviles. Incluye acceso y registro de empresas, perfil empresarial, tablero, diagnóstico, inventario, publicaciones de materiales, solicitudes logísticas e indicadores. Las cuentas admiten inicio, cierre y recuperación de sesión y contraseña. El acceso a la presentación pública requiere conexión a internet.
 
-La aplicación cuenta con dos modos de almacenamiento. En el modo de demostración, las cuentas y operaciones se guardan localmente y no se sincronizan entre dispositivos. Con Supabase configurado, se habilitan autenticación y persistencia en la nube para los perfiles, el inventario, las publicaciones de materiales y las solicitudes logísticas. Las imágenes de materiales se pueden guardar en Supabase Storage.
+La aplicación cuenta con dos modos de almacenamiento. En el modo de demostración, las cuentas y operaciones se guardan localmente y no se sincronizan entre dispositivos. Con el servicio Supabase configurado, se habilitan autenticación y persistencia compartida para perfiles, inventario, publicaciones y solicitudes logísticas. Las imágenes de materiales también pueden guardarse en el servicio. Los productos locales se pueden recuperar al pasar una cuenta a la nube.
 
-La integración está preparada en el código, pero requiere un proyecto Supabase, la ejecución de la migración incluida y la configuración de la URL y la clave pública para activar el modo de nube. La migración define políticas RLS para los datos empresariales y un bucket para las imágenes. Sin esa configuración, la aplicación continúa en modo local.
+La conexión compartida requiere un proyecto Supabase con las dos migraciones incluidas en `eco_logic_smart/supabase/migrations/`. La migración base habilita perfiles, inventario, publicaciones, solicitudes y fotografías; la segunda añade propuestas de intercambio y solicitudes para unirse a rutas. Sin la configuración del servicio, la aplicación continúa en modo local. El flujo y los requisitos de la publicación están en el [README de la aplicación](eco_logic_smart/README.md).
+
+### Uso básico
+
+1. La empresa crea una cuenta e ingresa sus datos básicos.
+2. En **Recursos**, registra productos, cantidades y el nivel mínimo que desea vigilar. El inventario permanece privado.
+3. En **Circular**, publica solo el material que desea ofrecer. Puede marcarlo para aprovechamiento o intercambio, añadir una descripción y adjuntar una fotografía.
+4. En **Rutas**, registra origen, destino, tipo de entrega, capacidad o carga y fecha. Otras empresas pueden solicitar unirse a una ruta compartida.
+5. En **Indicadores**, revisa la actividad guardada, las existencias bajas, materiales publicados y destinos repetidos.
+
+El diagnóstico señala oportunidades a partir de los datos registrados. Las coincidencias de materiales o destinos no garantizan un acuerdo: las empresas todavía coordinan las condiciones de intercambio o transporte.
 
 ## Plan de trabajo del grupo
 
-El grupo organizó la planeación por semanas y fases. Como el cronograma no asigna fechas de calendario, la secuencia se conserva por semana.
+El grupo organizó la planeación inicial por semanas y fases. Como el cronograma no asigna fechas de calendario, la secuencia se conserva por semana. La tabla registra las actividades y entregables propuestos; no confirma por sí sola que cada actividad se haya completado.
 
 | Semana y fase | Actividades previstas | Entregable o evidencia esperada |
 | --- | --- | --- |
@@ -50,8 +60,8 @@ El grupo organizó la planeación por semanas y fases. Como el cronograma no asi
 | **2. Exploración del contexto** | Observación de negocios y revisión de información sobre pymes, turismo, logística y economía circular; identificación de actores y preparación de entrevistas y encuestas. | Plan de investigación, mapa preliminar de actores e instrumentos preparados. |
 | **3. Investigación del problema** | Realización de entrevistas, encuestas y observaciones; organización de datos e identificación de necesidades recurrentes. | Diagnóstico y banco de evidencias. La meta propuesta es cinco entrevistas o entre diez y veinte encuestas, además de observaciones documentadas. |
 | **4. Definición del reto** | Análisis de causas y efectos, definición del perfil del usuario, delimitación del problema y formulación de la pregunta de diseño. | Ficha del reto con usuario, problema, evidencia local y la pregunta: «¿De qué manera puede EcoLogiSmart ayudar a las pymes de Cartagena a reducir costos y desperdicios mediante una mejor gestión de recursos, el aprovechamiento de materiales y la logística compartida?» |
-| **5. Ideación y alternativas** | Generación de opciones, elaboración de bocetos y comparación por impacto, costo, innovación y viabilidad. | Portafolio de al menos diez ideas y matriz de selección con criterios cuantificados. Las opciones propuestas son: app de inventarios, mercado de residuos, plataforma logística, sistema de rutas, banco de materiales, tablero de indicadores, solución para hoteles, transporte compartido, plataforma integral y consultoría digital. |
-| **6. Diseño conceptual** | Definición del funcionamiento y de los componentes STEAM e industriales; elaboración de diagramas de flujo, prototipo conceptual y presupuesto preliminar. | Diseño conceptual, especificaciones, presupuesto preliminar y responsabilidades. |
+| **5. Ideación y alternativas** | Generación de opciones, elaboración de bocetos y comparación por impacto, costo, innovación y viabilidad. | Portafolio de al menos diez ideas y matriz de selección con criterios cuantificados. Las opciones propuestas incluyen una aplicación de inventarios, mercado de materiales, sistema de rutas, banco de materiales, tablero de indicadores y transporte compartido. |
+| **6. Diseño conceptual** | Definición del funcionamiento y de los componentes STEAM e industriales; elaboración de diagramas de flujo, prototipo conceptual y presupuesto preliminar. | Diseño conceptual, especificaciones, presupuesto preliminar y responsabilidades. La aplicación disponible constituye un prototipo funcional para presentar y validar la propuesta. |
 
 Las entrevistas, encuestas y observaciones de las semanas 2 y 3 son metas de investigación. El plan propone evitar la solicitud de datos financieros privados y de permisos empresariales que no sean necesarios para validar el prototipo.
 
@@ -67,7 +77,7 @@ Las entrevistas, encuestas y observaciones de las semanas 2 y 3 son metas de inv
 | Indicadores | Medición de eficiencia, costos, tiempos, materiales aprovechados y consumo. |
 | Sostenibilidad | Reducción de desperdicios, recorridos innecesarios y uso ineficiente de recursos. |
 
-El enfoque STEAM combina diseño de interfaz, tecnología, organización de datos, análisis operativo y evaluación de impacto. El diseño conceptual contempla módulos de recursos e inventarios, materiales, logística e indicadores, junto con una base de datos.
+El enfoque STEAM combina diseño de interfaz, tecnología, organización de datos, análisis operativo y evaluación de impacto. La aplicación permite mostrar un primer prototipo de los módulos de recursos e inventarios, materiales, logística e indicadores.
 
 ## Indicadores iniciales
 
@@ -86,6 +96,8 @@ El grupo propone estas medidas para evaluar el proyecto. Sus valores dependerán
 El prototipo es una herramienta de apoyo operativo, no un sistema de auditoría financiera. La información se limita a los datos necesarios para organizar recursos, materiales y transporte, lo que facilita la validación con pymes.
 
 Como entregables del proyecto, el grupo planteó un diagnóstico sustentado en evidencia de usuarios, la definición del reto, una matriz de selección, el diseño de la plataforma, el flujo del servicio, un presupuesto preliminar e indicadores de impacto. La aplicación ya cuenta con un prototipo funcional; su alcance técnico se describe en la sección anterior.
+
+Para explicar la propuesta a personas que no conocen el proyecto, el [guion de sustentación en PDF](output/pdf/guion_sustentacion_ecologismart.pdf) divide la exposición entre cuatro integrantes. La [versión editable](guion_sustentacion.md) conserva el texto fuente.
 
 ## Documentación relacionada
 

@@ -13,13 +13,13 @@ En VS Code abre la carpeta raíz del repositorio y selecciona una configuración
 
 La configuración de ejecución de VS Code incluye el Project URL y la publishable key del proyecto EcoLogiSmart. Ejecuta **EcoLogiSmart (Web Server, abrir Edge manualmente)** o **EcoLogiSmart (Android)** para usarlos. La publishable key está diseñada para clientes móviles/web; nunca incluyas una clave `service_role` en la app.
 
-Antes de usar las cuentas empresariales y la sincronización, ejecuta una vez `supabase/migrations/20261025000000_ecologismart_core.sql` en el SQL Editor del proyecto. También configura los Redirect URLs de Auth según la sección siguiente. Si ejecutas Flutter desde una terminal en vez de VS Code, define `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` con `--dart-define`; sin esos valores, la aplicación usa almacenamiento local de demostración.
+Antes de usar las cuentas empresariales y la sincronización, ejecuta en orden los archivos `.sql` de `supabase/migrations/` en el SQL Editor del proyecto: `20261025000000_ecologismart_core.sql` y `20261029000000_marketplace_and_routes.sql`. El segundo habilita intercambios y solicitudes para unirse a rutas. También configura los Redirect URLs de Auth según la sección siguiente. Si Flutter se ejecuta desde una terminal en vez de VS Code, se definen `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` con `--dart-define`; sin esos valores, la aplicación usa almacenamiento local de demostración.
 
-La recuperación de contraseña móvil requiere registrar `co.ecologismart.app://login-callback` en **URL Configuration → Redirect URLs** de Supabase Auth. Para la versión web registra `https://jmartinezsys.github.io/EcoLogiSmart/` y los orígenes locales `http://127.0.0.1:5319/**` y `http://localhost:5319/**`. El redirect web conserva la subruta `/EcoLogiSmart/` que necesita GitHub Pages.
+La recuperación de contraseña móvil requiere registrar `co.ecologismart.app://login-callback` en **URL Configuration → Redirect URLs** de Supabase Auth. Para la versión web se registra `https://jmartinezsys.github.io/EcoLogiSmart/` y los orígenes locales `http://127.0.0.1:5319/**` y `http://localhost:5319/**`. El redirect web conserva la subruta `/EcoLogiSmart/` que necesita GitHub Pages.
 
 ## Publicación web
 
-El workflow `.github/workflows/deploy-ecologismart-web.yml` compila con la configuración Supabase y publica en GitHub Pages al actualizar `main`. Habilita una sola vez **GitHub → Settings → Pages → Build and deployment → Source: GitHub Actions**. Después de una ejecución exitosa de la acción, la URL pública es `https://jmartinezsys.github.io/EcoLogiSmart/`.
+El workflow `.github/workflows/deploy-ecologismart-web.yml` compila con la configuración Supabase y publica en GitHub Pages al actualizar `main`. La versión publicada se consulta en [jmartinezsys.github.io/EcoLogiSmart](https://jmartinezsys.github.io/EcoLogiSmart/).
 
 ## Flujo de la aplicación
 
