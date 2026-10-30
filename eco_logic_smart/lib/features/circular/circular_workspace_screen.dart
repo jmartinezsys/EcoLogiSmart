@@ -518,6 +518,53 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
       ? widget.account.id
       : widget.account.email.toLowerCase();
 
+  Future<void> _deleteListing(MaterialListing listing) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar publicación'),
+        content: Text(
+          '¿Quieres retirar “${listing.title}” de Circular? Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB42318),
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await WorkspaceRepository.deleteMaterial(
+        account: widget.account,
+        listing: listing,
+      );
+      if (!mounted) return;
+      setState(() {
+        _listings.removeWhere((item) => item.id == listing.id);
+        _exchangeRequests.removeWhere((item) => item.listingId == listing.id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Publicación eliminada.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo eliminar. Revisa tu conexión e inténtalo de nuevo.'),
+        ),
+      );
+    }
+  }
+
   Widget _exchangeInbox({
     required String title,
     required List<MaterialExchangeRequest> requests,
@@ -577,6 +624,21 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _MaterialCard(listing: listing),
+          if (own)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _deleteListing(listing),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: Color(0xFFB42318),
+                ),
+                label: const Text(
+                  'Eliminar publicación',
+                  style: TextStyle(color: Color(0xFFB42318)),
+                ),
+              ),
+            ),
           if (listing.exchangeFor?.isNotEmpty == true)
             Padding(
               padding: const EdgeInsets.only(top: 8),

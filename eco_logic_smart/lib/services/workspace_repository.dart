@@ -231,6 +231,24 @@ class WorkspaceRepository {
     await preferences.setString(_materialsKey, jsonEncode(rows));
   }
 
+  static Future<void> deleteMaterial({
+    required CompanyAccount account,
+    required MaterialListing listing,
+  }) async {
+    if (_cloud && !listing.isLegacyLocal) {
+      await BackendConfig.client
+          .from('material_listings')
+          .delete()
+          .eq('id', listing.id)
+          .eq('company_id', _ownerId(account));
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final rows = _readList(preferences, _materialsKey)
+      ..removeWhere((row) => row['id'] == listing.id);
+    await preferences.setString(_materialsKey, jsonEncode(rows));
+  }
+
   static Future<List<MaterialExchangeRequest>> loadExchangeRequests() async {
     if (_cloud) {
       try {
