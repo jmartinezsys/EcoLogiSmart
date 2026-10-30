@@ -375,8 +375,9 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
       (total, listing) => total + listing.quantity,
     );
     return PageFrame(
-      title: 'Economía circular',
-      subtitle: 'Comparte excedentes y explora ofertas de otras empresas.',
+      title: 'Circular',
+      subtitle:
+          'Publica excedentes y coordina aprovechamientos e intercambios.',
       action: IconButton.filledTonal(
         tooltip: 'Publicar material',
         onPressed: _saving ? null : _publish,
@@ -413,6 +414,15 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
               ? 'El inventario sigue siendo privado. Solo compartes los materiales que publicas aquí.'
               : 'Las publicaciones se guardan en este dispositivo. Para compartirlas entre teléfonos, conecta el proyecto a Supabase.',
           color: const Color(0xFFEAF0F8),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _saving ? null : _publish,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Publicar un material'),
+          ),
         ),
         if (BackendConfig.isInitialized &&
             _listings.any((listing) => listing.isLegacyLocal)) ...[
@@ -622,6 +632,13 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                       'Vuelve a publicar este material para habilitar propuestas.',
                       textAlign: TextAlign.end,
                       style: TextStyle(fontSize: 11),
+                    )
+                  : BackendConfig.isInitialized &&
+                        !WorkspaceRepository.hasExchangeSchema
+                  ? const Text(
+                      'Activa la migración de intercambios en Supabase para proponer.',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(fontSize: 11, color: Colors.deepOrange),
                     )
                   : TextButton.icon(
                       onPressed: () => _proposeExchange(listing),

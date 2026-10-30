@@ -129,6 +129,148 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
     }
   }
 
+  Future<void> _publishSurplus(InventoryItem item) async {
+    final quantityController = TextEditingController(
+      text: item.quantity.toString(),
+    );
+    final wantedController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var status = 'Disponible';
+    final result = await showDialog<(double, String, String?)>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Publicar ${item.name}'),
+          scrollable: true,
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: quantityController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Cantidad para ofrecer (${item.unit})',
+                    helperText:
+                        'Disponible en inventario: ${item.quantity} ${item.unit}',
+                  ),
+                  validator: (value) {
+                    final quantity = double.tryParse(
+                      (value ?? '').trim().replaceAll(',', '.'),
+                    );
+                    if (quantity == null || quantity <= 0) {
+                      return 'Ingresa una cantidad mayor que cero';
+                    }
+                    if (quantity > item.quantity) {
+                      return 'No puede superar la cantidad del inventario';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'Modalidad'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Disponible',
+                      child: Text('Ofrecer para aprovechamiento'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Intercambio',
+                      child: Text('Ofrecer a cambio de otro producto'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => status = value ?? 'Disponible'),
+                ),
+                if (status == 'Intercambio') ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: wantedController,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Producto que deseas recibir',
+                    ),
+                    validator: (value) =>
+                        status == 'Intercambio' &&
+                            (value == null || value.trim().isEmpty)
+                        ? 'Indica qué producto buscas'
+                        : null,
+                  ),
+                ],
+                const SizedBox(height: 10),
+                const Text(
+                  'Se publica una oferta con esta cantidad; el registro de inventario no se modifica.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.pop(dialogContext, (
+                  double.parse(
+                    quantityController.text.trim().replaceAll(',', '.'),
+                  ),
+                  status,
+                  status == 'Intercambio' ? wantedController.text.trim() : null,
+                ));
+              },
+              icon: const Icon(Icons.recycling_outlined),
+              label: const Text('Publicar en Circular'),
+            ),
+          ],
+        ),
+      ),
+    );
+    quantityController.dispose();
+    wantedController.dispose();
+    if (result == null || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      await WorkspaceRepository.publishMaterial(
+        account: widget.account,
+        listing: MaterialListing(
+          id: '',
+          companyId: widget.account.id,
+          title: item.name,
+          description: 'Excedente publicado desde el inventario de la empresa.',
+          quantity: result.$1,
+          unit: item.unit,
+          status: result.$2,
+          companyName: widget.account.businessName,
+          city: widget.account.city,
+          category: item.category,
+          exchangeFor: result.$3,
+        ),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Excedente publicado en Circular.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo publicar el excedente.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = _items
@@ -143,7 +285,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         .toSet()
         .length;
     return PageFrame(
-      title: 'Recursos e inventario',
+      title: 'Recursos',
       subtitle: 'Controla existencias y anticipa necesidades.',
       action: IconButton.filledTonal(
         tooltip: 'Agregar recurso',
@@ -177,13 +319,6 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
           ),
           const SizedBox(height: 16),
         ],
-        InfoCard(
-          icon: Icons.lock_outline,
-          title: 'Inventario privado de ${widget.account.businessName}',
-          subtitle:
-              'Aquí ves los recursos de esta empresa. Para consultar productos que otras empresas publicaron para compartir, entra a Economía circular.',
-          color: const Color(0xFFEAF0F8),
-        ),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
@@ -256,7 +391,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
             ],
           )
         else
-          for (final item in visible)
+          for (final item in visible) ...[
             InfoCard(
               icon: Icons.inventory_2_outlined,
               title: item.name,
@@ -266,6 +401,16 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               ].where((part) => part.isNotEmpty).join(' · '),
               trailing: '${item.quantity} ${item.unit}',
             ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _saving ? null : () => _publishSurplus(item),
+                icon: const Icon(Icons.recycling_outlined, size: 18),
+                label: const Text('Publicar excedente en Circular'),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(15),

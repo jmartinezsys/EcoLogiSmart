@@ -118,8 +118,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final firstName = _account.contactName.trim().split(RegExp(r'\s+')).first;
     return PageFrame(
-      title: 'Hola, $firstName',
-      subtitle: 'Este es el espacio de ${_account.businessName}.',
+      title: 'Inicio',
+      subtitle: 'Hola, $firstName · ${_account.businessName}.',
       action: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -183,8 +183,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           Image.asset(
                             'assets/images/ecologismart_isotipo.png',
-                            width: 36,
-                            height: 36,
+                            width: 58,
+                            height: 58,
+                            fit: BoxFit.contain,
                             errorBuilder: (_, _, _) => const Icon(
                               Icons.eco_rounded,
                               color: Color(0xFFD8E9DC),
@@ -249,47 +250,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             Expanded(
-              child: MetricTile(
-                label: 'Recursos',
-                value: _loadingActivity
-                    ? '…'
-                    : _activityError != null
-                    ? '—'
-                    : '$_inventoryCount',
-                icon: Icons.inventory_2_outlined,
-                detail: 'registrados por tu empresa',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => widget.onNavigate(1),
+                child: MetricTile(
+                  label: 'Recursos',
+                  value: _loadingActivity
+                      ? '…'
+                      : _activityError != null
+                      ? '—'
+                      : '$_inventoryCount',
+                  icon: Icons.inventory_2_outlined,
+                  detail: 'Toca para abrir inventario',
+                ),
               ),
             ),
             SizedBox(width: 11),
             Expanded(
-              child: MetricTile(
-                label: 'Materiales',
-                value: _loadingActivity
-                    ? '…'
-                    : _activityError != null
-                    ? '—'
-                    : '$_materialCount',
-                icon: Icons.recycling_outlined,
-                detail: 'publicados por tu empresa',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => widget.onNavigate(2),
+                child: MetricTile(
+                  label: 'Materiales',
+                  value: _loadingActivity
+                      ? '…'
+                      : _activityError != null
+                      ? '—'
+                      : '$_materialCount',
+                  icon: Icons.recycling_outlined,
+                  detail: 'Toca para abrir Circular',
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        InfoCard(
-          icon: Icons.local_shipping_outlined,
-          title: 'Solicitudes de ruta',
-          subtitle: _activityError != null
-              ? 'Los datos de actividad no están disponibles.'
-              : _routeCount == 0
-              ? 'Aún no hay solicitudes para esta empresa.'
-              : 'Solicitudes activas de ${_account.businessName}.',
-          trailing: _loadingActivity
-              ? '…'
-              : _activityError != null
-              ? '—'
-              : '$_routeCount',
-          color: Color(0xFFFFF0DF),
+        Semantics(
+          button: true,
+          label: 'Abrir rutas compartidas',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => widget.onNavigate(3),
+            child: InfoCard(
+              icon: Icons.local_shipping_outlined,
+              title: 'Solicitudes de ruta',
+              subtitle: _activityError != null
+                  ? 'Los datos de actividad no están disponibles.'
+                  : _routeCount == 0
+                  ? 'Aún no hay solicitudes para esta empresa. Toca para publicar o buscar una ruta.'
+                  : 'Toca para revisar rutas y solicitudes de ${_account.businessName}.',
+              trailing: _loadingActivity
+                  ? '…'
+                  : _activityError != null
+                  ? '—'
+                  : '$_routeCount',
+              color: const Color(0xFFFFF0DF),
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         const InfoCard(

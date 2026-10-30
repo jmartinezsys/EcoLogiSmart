@@ -211,8 +211,8 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
         .where((count) => count > 1)
         .length;
     return PageFrame(
-      title: 'Logística compartida',
-      subtitle: 'Agrupa entregas y coordina recorridos.',
+      title: 'Rutas',
+      subtitle: 'Publica una necesidad de transporte o únete a otra ruta.',
       action: IconButton.filledTonal(
         tooltip: 'Solicitar ruta',
         onPressed: _saving ? null : _requestRoute,
@@ -223,10 +223,18 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             !WorkspaceRepository.hasRouteSharingSchema) ...[
           const InfoCard(
             icon: Icons.warning_amber_rounded,
-            title: 'Falta actualizar el esquema de Supabase',
+            title: 'Falta activar las solicitudes para unirse a rutas',
             subtitle:
-                'Puedes consultar las rutas existentes. Para solicitar unirse y responder solicitudes, ejecuta la migración marketplace_and_routes en el SQL Editor de Supabase.',
+                'En el SQL Editor ejecuta 20261029000000_marketplace_and_routes.sql. Luego vuelve a comprobar la conexión.',
             color: Color(0xFFFFF0DF),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Comprobar'),
+            ),
           ),
           const SizedBox(height: 12),
         ],
@@ -241,6 +249,15 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
               ? 'Las empresas conectadas pueden ver solicitudes abiertas y buscar destinos en común.'
               : 'Estas solicitudes solo se comparten en este dispositivo. Para conectarlas entre empresas se necesita configurar Supabase.',
           color: const Color(0xFFEAF0F8),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _saving ? null : _requestRoute,
+            icon: const Icon(Icons.add_road),
+            label: const Text('Publicar solicitud de ruta'),
+          ),
         ),
         const SizedBox(height: 16),
         Container(
@@ -407,11 +424,19 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
           if (!own && route.status == 'Abierta' && mine.isEmpty)
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _joinRoute(route),
-                icon: const Icon(Icons.group_add_outlined),
-                label: const Text('Solicitar unirme'),
-              ),
+              child:
+                  BackendConfig.isInitialized &&
+                      !WorkspaceRepository.hasRouteSharingSchema
+                  ? const Text(
+                      'Activa la migración de rutas en Supabase para unirte.',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(fontSize: 11, color: Colors.deepOrange),
+                    )
+                  : TextButton.icon(
+                      onPressed: () => _joinRoute(route),
+                      icon: const Icon(Icons.group_add_outlined),
+                      label: const Text('Solicitar unirme'),
+                    ),
             ),
           if (!own && mine.isNotEmpty)
             for (final request in mine)
