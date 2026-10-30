@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../data/resource_catalog.dart';
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
 import '../../services/backend_config.dart';
@@ -9,9 +8,14 @@ import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 
 class CircularWorkspaceScreen extends StatefulWidget {
-  const CircularWorkspaceScreen({super.key, required this.account});
+  const CircularWorkspaceScreen({
+    super.key,
+    required this.account,
+    this.onNavigate,
+  });
 
   final CompanyAccount account;
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<CircularWorkspaceScreen> createState() =>
@@ -21,10 +25,6 @@ class CircularWorkspaceScreen extends StatefulWidget {
 class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   List<MaterialListing> _listings = [];
   List<MaterialExchangeRequest> _exchangeRequests = [];
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _quantityController = TextEditingController();
-  final _unitController = TextEditingController(text: 'kg');
   String _filter = 'Todos';
   bool _loading = true;
   bool _saving = false;
@@ -32,10 +32,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _quantityController.dispose();
-    _unitController.dispose();
     super.dispose();
   }
 
@@ -69,134 +65,125 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   }
 
   Future<void> _publish() async {
+    List<InventoryItem> inventory;
+    try {
+      inventory = await WorkspaceRepository.loadInventory(widget.account);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo cargar tu inventario para publicar.'),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    if (inventory.isEmpty) {
+      final goToInventory = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Agrega primero un recurso'),
+          content: const Text(
+            'Circular publica materiales que ya están registrados en el inventario de tu empresa.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Ahora no'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Ir a Recursos'),
+            ),
+          ],
+        ),
+      );
+      if (goToInventory == true) widget.onNavigate?.call(1);
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
-    final title = _titleController..clear();
-    final description = _descriptionController..clear();
-    final quantity = _quantityController..clear();
-    final unit = _unitController..text = 'kg';
+    final description = TextEditingController();
+    final quantity = TextEditingController(
+      text: inventory.first.quantity.toString(),
+    );
     final exchangeFor = TextEditingController();
-    final customTitle = TextEditingController();
-    var category = ResourceCatalog.categories.first;
-    var product = ResourceCatalog.productsFor(category).first;
-    var otherProduct = false;
+    var selectedItem = inventory.first;
     var status = 'Disponible';
     XFile? photo;
+    if (!mounted) return;
     final draft = await showDialog<_ListingDraft>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Publicar material'),
+          title: const Text('Publicar desde mi inventario'),
+          scrollable: true,
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextFormField(
-                    controller: title,
-                    readOnly: !otherProduct,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del material',
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Escribe el material'
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    initialValue: category,
+                    initialValue: selectedItem.id,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Categoría'),
-                    items: ResourceCatalog.categories
+                    decoration: const InputDecoration(
+                      labelText: 'Material del inventario',
+                    ),
+                    items: inventory
                         .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value, overflow: TextOverflow.ellipsis),
+                          (item) => DropdownMenuItem(
+                            value: item.id,
+                            child: Text(
+                              '${item.name} · ${item.quantity} ${item.unit}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
-                    onChanged: (value) {
-                      if (value == null) return;
+                    onChanged: (id) {
+                      if (id == null) return;
+                      final found = inventory.where((item) => item.id == id);
+                      if (found.isEmpty) return;
                       setDialogState(() {
-                        category = value;
-                        final products = ResourceCatalog.productsFor(value);
-                        product = products.isEmpty ? '' : products.first;
-                        otherProduct = products.isEmpty;
-                        title.text = otherProduct ? customTitle.text : product;
+                        selectedItem = found.first;
+                        quantity.text = selectedItem.quantity.toString();
                       });
                     },
                   ),
-                  if (ResourceCatalog.productsFor(category).isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      initialValue: product,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Producto'),
-                      items: [
-                        ...ResourceCatalog.productsFor(category).map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value, overflow: TextOverflow.ellipsis),
-                          ),
-                        ),
-                        const DropdownMenuItem(
-                          value: '__other__',
-                          child: Text('Otro (escribir)'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setDialogState(() {
-                          otherProduct = value == '__other__';
-                          product = otherProduct ? '' : value;
-                          title.text = otherProduct
-                              ? customTitle.text
-                              : product;
-                        });
-                      },
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: quantity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                  ],
-                  if (otherProduct) ...[
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: customTitle,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        labelText: 'Escribe el producto',
-                      ),
-                      onChanged: (value) => title.text = value,
-                      validator: (value) =>
-                          otherProduct &&
-                              (value == null || value.trim().isEmpty)
-                          ? 'Escribe el producto'
-                          : null,
+                    decoration: InputDecoration(
+                      labelText:
+                          'Cantidad que publicarás (${selectedItem.unit})',
+                      helperText:
+                          'Disponible: ${selectedItem.quantity} ${selectedItem.unit}',
                     ),
-                  ],
+                    validator: (value) {
+                      final amount = double.tryParse(
+                        (value ?? '').trim().replaceAll(',', '.'),
+                      );
+                      if (amount == null || amount <= 0) {
+                        return 'Ingresa una cantidad mayor que cero';
+                      }
+                      if (amount > selectedItem.quantity) {
+                        return 'Supera lo disponible en el inventario';
+                      }
+                      return null;
+                    },
+                  ),
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: description,
                     decoration: const InputDecoration(
-                      labelText: 'Descripción y estado',
+                      labelText: 'Descripción (opcional)',
                     ),
                     maxLines: 2,
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: unit.text,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Unidad'),
-                    items: ResourceCatalog.units
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) unit.text = value;
-                    },
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
@@ -230,30 +217,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                           : null,
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: quantity,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Cantidad',
-                          ),
-                          validator: (value) {
-                            final parsed = double.tryParse(
-                              (value ?? '').replaceAll(',', '.'),
-                            );
-                            return parsed == null || parsed <= 0
-                                ? 'Usa un valor mayor que cero'
-                                : null;
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: () async {
@@ -302,12 +265,12 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                     listing: MaterialListing(
                       id: '',
                       companyId: widget.account.id,
-                      title: title.text.trim(),
+                      title: selectedItem.name,
                       description: description.text.trim(),
                       quantity: amount,
-                      unit: unit.text.trim().isEmpty ? 'kg' : unit.text.trim(),
+                      unit: selectedItem.unit,
                       status: status,
-                      category: category,
+                      category: selectedItem.category,
                       exchangeFor: status == 'Intercambio'
                           ? exchangeFor.text.trim()
                           : null,
@@ -325,7 +288,8 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
       ),
     );
     exchangeFor.dispose();
-    customTitle.dispose();
+    description.dispose();
+    quantity.dispose();
     if (draft == null || !mounted) return;
 
     setState(() => _saving = true);
@@ -674,7 +638,9 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
             style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
           ),
         Text(
-          '${request.requesterCompanyName} ofrece ${request.offeredProduct} · ${request.status}',
+          '${request.requesterCompanyName} ofrece ${request.offeredProduct}'
+          '${request.offeredQuantity > 0 ? ' · ${request.offeredQuantity} ${request.offeredUnit}' : ''}'
+          ' · ${request.status}',
           style: const TextStyle(fontSize: 12),
         ),
         if (request.message.isNotEmpty)
@@ -706,93 +672,124 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   );
 
   Future<void> _proposeExchange(MaterialListing listing) async {
+    List<InventoryItem> inventory;
+    try {
+      inventory = (await WorkspaceRepository.loadInventory(
+        widget.account,
+      )).where((item) => item.quantity > 0).toList();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo consultar el inventario para proponer.'),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    if (inventory.isEmpty) {
+      final goToInventory = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Necesitas un producto para ofrecer'),
+          content: const Text(
+            'Agrega productos y cantidades en Recursos. Después podrás elegir qué ofrecer a cambio de este material.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Ahora no'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Ir a Recursos'),
+            ),
+          ],
+        ),
+      );
+      if (goToInventory == true) widget.onNavigate?.call(1);
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
-    final offered = TextEditingController();
     final message = TextEditingController();
-    var category = ResourceCatalog.categories.first;
-    var product = ResourceCatalog.productsFor(category).first;
-    var custom = false;
-    final result = await showDialog<(String, String)?>(
+    final quantity = TextEditingController(
+      text: inventory.first.quantity.toString(),
+    );
+    var selectedItem = inventory.first;
+    if (!mounted) return;
+    final result = await showDialog<(InventoryItem, double, String)?>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
           title: const Text('Proponer intercambio'),
+          scrollable: true,
           content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'La empresa busca: ${listing.exchangeFor ?? listing.title}',
+                  'La empresa busca ${listing.exchangeFor ?? listing.title}. Tú puedes ofrecer:',
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Al aceptar, se reserva la publicación; la entrega se coordina entre las empresas.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: category,
+                  initialValue: selectedItem.id,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Categoría que ofreces',
+                    labelText: 'Producto de tu inventario',
                   ),
-                  items: ResourceCatalog.categories
+                  items: inventory
                       .map(
-                        (value) => DropdownMenuItem(
-                          value: value,
-                          child: Text(value, overflow: TextOverflow.ellipsis),
+                        (item) => DropdownMenuItem(
+                          value: item.id,
+                          child: Text(
+                            '${item.name} · ${item.quantity} ${item.unit}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
+                  onChanged: (id) {
+                    if (id == null) return;
+                    final found = inventory.where((item) => item.id == id);
+                    if (found.isEmpty) return;
                     setDialogState(() {
-                      category = value;
-                      final products = ResourceCatalog.productsFor(value);
-                      custom = products.isEmpty;
-                      product = products.isEmpty ? '' : products.first;
-                      offered.text = custom ? '' : product;
+                      selectedItem = found.first;
+                      quantity.text = selectedItem.quantity.toString();
                     });
                   },
                 ),
-                if (ResourceCatalog.productsFor(category).isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: product,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Producto ofrecido',
-                    ),
-                    items: [
-                      ...ResourceCatalog.productsFor(category).map(
-                        (value) => DropdownMenuItem(
-                          value: value,
-                          child: Text(value, overflow: TextOverflow.ellipsis),
-                        ),
-                      ),
-                      const DropdownMenuItem(
-                        value: '__other__',
-                        child: Text('Otro (escribir)'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setDialogState(() {
-                        custom = value == '__other__';
-                        product = custom ? '' : value;
-                        offered.text = custom ? '' : value;
-                      });
-                    },
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: quantity,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                ],
-                if (custom) ...[
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: offered,
-                    decoration: const InputDecoration(
-                      labelText: 'Producto ofrecido',
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Escribe el producto'
-                        : null,
+                  decoration: InputDecoration(
+                    labelText: 'Cantidad ofrecida (${selectedItem.unit})',
+                    helperText:
+                        'En tu inventario: ${selectedItem.quantity} ${selectedItem.unit}',
                   ),
-                ],
+                  validator: (value) {
+                    final offeredAmount = double.tryParse(
+                      (value ?? '').trim().replaceAll(',', '.'),
+                    );
+                    if (offeredAmount == null || offeredAmount <= 0) {
+                      return 'Ingresa una cantidad mayor que cero';
+                    }
+                    if (offeredAmount > selectedItem.quantity) {
+                      return 'No puedes ofrecer más de lo inventariado';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: message,
@@ -811,10 +808,10 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
             ),
             FilledButton(
               onPressed: () {
-                if (!custom) offered.text = product;
                 if (!formKey.currentState!.validate()) return;
                 Navigator.pop(dialogContext, (
-                  offered.text.trim(),
+                  selectedItem,
+                  double.parse(quantity.text.trim().replaceAll(',', '.')),
                   message.text.trim(),
                 ));
               },
@@ -824,17 +821,16 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         ),
       ),
     );
-    if (result == null || !mounted) {
-      offered.dispose();
-      message.dispose();
-      return;
-    }
+    quantity.dispose();
+    if (result == null || !mounted) return;
     try {
       await WorkspaceRepository.requestMaterialExchange(
         account: widget.account,
         listing: listing,
-        offeredProduct: result.$1,
-        message: result.$2,
+        offeredProduct: result.$1.name,
+        offeredQuantity: result.$2,
+        offeredUnit: result.$1.unit,
+        message: result.$3,
       );
       await _load();
       if (mounted) {
@@ -849,7 +845,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         );
       }
     } finally {
-      offered.dispose();
       message.dispose();
     }
   }

@@ -108,6 +108,8 @@ class MaterialExchangeRequest {
     required this.requesterCompanyId,
     required this.requesterCompanyName,
     required this.offeredProduct,
+    this.offeredQuantity = 0,
+    this.offeredUnit = 'unidades',
     required this.status,
     required this.createdAt,
     this.message = '',
@@ -118,6 +120,8 @@ class MaterialExchangeRequest {
   final String requesterCompanyId;
   final String requesterCompanyName;
   final String offeredProduct;
+  final double offeredQuantity;
+  final String offeredUnit;
   final String status;
   final DateTime createdAt;
   final String message;
@@ -130,6 +134,8 @@ class MaterialExchangeRequest {
         requesterCompanyName:
             json['requester_company_name'] as String? ?? 'Empresa',
         offeredProduct: json['offered_product'] as String? ?? '',
+        offeredQuantity: (json['offered_quantity'] as num?)?.toDouble() ?? 0,
+        offeredUnit: json['offered_unit'] as String? ?? 'unidades',
         status: json['status'] as String? ?? 'Pendiente',
         createdAt:
             DateTime.tryParse(json['created_at'] as String? ?? '') ??
@@ -143,6 +149,8 @@ class MaterialExchangeRequest {
     'requester_company_id': requesterCompanyId,
     'requester_company_name': requesterCompanyName,
     'offered_product': offeredProduct,
+    'offered_quantity': offeredQuantity,
+    'offered_unit': offeredUnit,
     'status': status,
     'created_at': createdAt.toIso8601String(),
     'message': message,

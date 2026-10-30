@@ -236,14 +236,17 @@ class WorkspaceRepository {
       try {
         final rows = await BackendConfig.client
             .from('material_exchange_requests')
-            .select()
+            .select('*,offered_quantity,offered_unit')
             .order('created_at', ascending: false);
         _missingSchemaTables.remove('material_exchange_requests');
         return rows
             .map((row) => MaterialExchangeRequest.fromJson(row))
             .toList();
       } on PostgrestException catch (error) {
-        if (error.code == 'PGRST205' || error.code == '42P01') {
+        if (error.code == 'PGRST205' ||
+            error.code == 'PGRST204' ||
+            error.code == '42703' ||
+            error.code == '42P01') {
           _missingSchemaTables.add('material_exchange_requests');
           return [];
         }
@@ -261,6 +264,8 @@ class WorkspaceRepository {
     required CompanyAccount account,
     required MaterialListing listing,
     required String offeredProduct,
+    required double offeredQuantity,
+    required String offeredUnit,
     String message = '',
   }) async {
     final row = {
@@ -268,6 +273,8 @@ class WorkspaceRepository {
       'requester_company_id': _ownerId(account),
       'requester_company_name': account.businessName,
       'offered_product': offeredProduct,
+      'offered_quantity': offeredQuantity,
+      'offered_unit': offeredUnit,
       'message': message,
       'status': 'Pendiente',
       'created_at': DateTime.now().toIso8601String(),

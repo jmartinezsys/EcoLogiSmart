@@ -51,6 +51,7 @@ class _AppShellState extends State<AppShell> {
       CircularWorkspaceScreen(
         key: ValueKey('circular-${_refreshVersions[2]}'),
         account: _account,
+        onNavigate: _selectTab,
       ),
       LogisticsWorkspaceScreen(
         key: ValueKey('logistics-${_refreshVersions[3]}'),

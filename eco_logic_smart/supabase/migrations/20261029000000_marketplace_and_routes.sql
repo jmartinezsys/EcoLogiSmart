@@ -43,6 +43,11 @@ create table if not exists public.material_exchange_requests (
   updated_at timestamptz not null default now()
 );
 
+alter table public.material_exchange_requests
+  add column if not exists offered_quantity numeric(12, 2) not null default 0
+    check (offered_quantity >= 0),
+  add column if not exists offered_unit text not null default 'unidades';
+
 create or replace function public.stamp_exchange_request()
 returns trigger
 language plpgsql
