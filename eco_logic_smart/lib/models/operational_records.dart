@@ -51,6 +51,7 @@ class MaterialListing {
     this.exchangeFor,
     this.imageUrl,
     this.localImageBytes,
+    this.isLegacyLocal = false,
   });
 
   final String id;
@@ -66,6 +67,7 @@ class MaterialListing {
   final String? exchangeFor;
   final String? imageUrl;
   final Uint8List? localImageBytes;
+  final bool isLegacyLocal;
 
   factory MaterialListing.fromJson(Map<String, dynamic> json) =>
       MaterialListing(
@@ -84,6 +86,7 @@ class MaterialListing {
         localImageBytes: json['image_base64'] is String
             ? base64Decode(json['image_base64'] as String)
             : null,
+        isLegacyLocal: json['is_legacy_local'] as bool? ?? false,
       );
 
   Map<String, Object?> toJson() => {

@@ -397,6 +397,17 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
               : 'Las publicaciones se guardan en este dispositivo. Para compartirlas entre teléfonos, conecta el proyecto a Supabase.',
           color: const Color(0xFFEAF0F8),
         ),
+        if (BackendConfig.isInitialized &&
+            _listings.any((listing) => listing.isLegacyLocal)) ...[
+          const SizedBox(height: 12),
+          const InfoCard(
+            icon: Icons.phone_android_outlined,
+            title: 'Publicaciones recuperadas de este dispositivo',
+            subtitle:
+                'Se muestran los materiales guardados en la versión anterior de este navegador. Para intercambiar, vuelve a publicarlos con la sesión conectada.',
+            color: Color(0xFFFFF4DE),
+          ),
+        ],
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(18),
@@ -534,11 +545,17 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
           if (!own && listing.status == 'Intercambio' && myRequests.isEmpty)
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _proposeExchange(listing),
-                icon: const Icon(Icons.swap_horiz),
-                label: const Text('Proponer intercambio'),
-              ),
+              child: listing.isLegacyLocal
+                  ? const Text(
+                      'Vuelve a publicar este material para habilitar propuestas.',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(fontSize: 11),
+                    )
+                  : TextButton.icon(
+                      onPressed: () => _proposeExchange(listing),
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('Proponer intercambio'),
+                    ),
             ),
           if (!own && myRequests.isNotEmpty)
             for (final request in myRequests)

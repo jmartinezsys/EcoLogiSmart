@@ -147,7 +147,23 @@ class WorkspaceRepository {
           .from('material_listings')
           .select()
           .order('created_at', ascending: false);
-      return rows.map((row) => MaterialListing.fromJson(row)).toList();
+      final cloudListings = rows
+          .map((row) => MaterialListing.fromJson(row))
+          .toList();
+      final preferences = await SharedPreferences.getInstance();
+      final legacyListings = _readList(preferences, _materialsKey)
+          .map(
+            (row) =>
+                MaterialListing.fromJson({...row, 'is_legacy_local': true}),
+          )
+          .toList();
+      final knownListings = cloudListings.map(_materialSignature).toSet();
+      return [
+        ...cloudListings,
+        ...legacyListings.where(
+          (listing) => knownListings.add(_materialSignature(listing)),
+        ),
+      ];
     }
     final preferences = await SharedPreferences.getInstance();
     return _readList(
@@ -155,6 +171,11 @@ class WorkspaceRepository {
       _materialsKey,
     ).map(MaterialListing.fromJson).toList();
   }
+
+  static String _materialSignature(MaterialListing listing) =>
+      '${listing.title.trim().toLowerCase()}|'
+      '${listing.companyName.trim().toLowerCase()}|'
+      '${listing.quantity}|${listing.unit.trim().toLowerCase()}';
 
   static Future<void> publishMaterial({
     required CompanyAccount account,
