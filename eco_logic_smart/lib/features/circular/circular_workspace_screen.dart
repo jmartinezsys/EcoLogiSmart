@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../data/resource_catalog.dart';
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
 import '../../services/backend_config.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
+import '../../shared/colombian_city_field.dart';
 
 class CircularWorkspaceScreen extends StatefulWidget {
   const CircularWorkspaceScreen({
@@ -43,6 +45,11 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
 
   Future<void> _load() async {
     try {
+      try {
+        await WorkspaceRepository.ensureChatIdentity();
+      } catch (_) {
+        // Missing chat migration or secure storage does not block Circular.
+      }
       final results = await Future.wait([
         WorkspaceRepository.loadMaterials(),
         WorkspaceRepository.loadExchangeRequests(),
@@ -109,6 +116,8 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
       text: inventory.first.quantity.toString(),
     );
     final exchangeFor = TextEditingController();
+    var desiredProduct = ResourceCatalog.allProducts.first;
+    var customDesiredProduct = false;
     var selectedItem = inventory.first;
     var status = 'Disponible';
     XFile? photo;
@@ -204,18 +213,51 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                   ),
                   if (status == 'Intercambio') ...[
                     const SizedBox(height: 10),
-                    TextFormField(
-                      controller: exchangeFor,
-                      textCapitalization: TextCapitalization.sentences,
+                    DropdownButtonFormField<String>(
+                      initialValue: desiredProduct,
+                      isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: '¿Qué producto deseas recibir?',
+                        labelText: 'Producto que deseas recibir',
                       ),
-                      validator: (value) =>
-                          status == 'Intercambio' &&
-                              (value == null || value.trim().isEmpty)
-                          ? 'Indica qué deseas recibir'
-                          : null,
+                      items: [
+                        ...ResourceCatalog.allProducts.map(
+                          (product) => DropdownMenuItem(
+                            value: product,
+                            child: Text(
+                              product,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const DropdownMenuItem(
+                          value: '__otro__',
+                          child: Text('Otro producto…'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          customDesiredProduct = value == '__otro__';
+                          if (!customDesiredProduct) desiredProduct = value;
+                        });
+                      },
                     ),
+                    if (customDesiredProduct) ...[
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: exchangeFor,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Escribe el producto que buscas',
+                        ),
+                        validator: (value) =>
+                            status == 'Intercambio' &&
+                                customDesiredProduct &&
+                                (value == null || value.trim().isEmpty)
+                            ? 'Escribe el producto que deseas recibir'
+                            : null,
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
@@ -272,7 +314,9 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                       status: status,
                       category: selectedItem.category,
                       exchangeFor: status == 'Intercambio'
-                          ? exchangeFor.text.trim()
+                          ? customDesiredProduct
+                                ? exchangeFor.text.trim()
+                                : desiredProduct
                           : null,
                       companyName: widget.account.businessName,
                       city: widget.account.city,
@@ -325,19 +369,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     final visible = _listings
         .where((item) => _filter == 'Todos' || item.status == _filter)
         .toList();
-    final incomingExchanges = _exchangeRequests.where((request) {
-      return _listings.any(
-        (listing) =>
-            listing.id == request.listingId && listing.companyId == _companyId,
-      );
-    }).toList();
-    final outgoingExchanges = _exchangeRequests
-        .where((request) => request.requesterCompanyId == _companyId)
-        .toList();
-    final totalQuantity = _listings.fold<double>(
-      0,
-      (total, listing) => total + listing.quantity,
-    );
     return PageFrame(
       title: 'Circular',
       subtitle:
@@ -437,10 +468,10 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
           children: [
             Expanded(
               child: MetricTile(
-                label: 'Material disponible',
-                value: totalQuantity.toStringAsFixed(1),
+                label: 'Publicaciones',
+                value: '${_listings.length}',
                 icon: Icons.recycling_outlined,
-                detail: 'en ${_listings.length} publicaciones',
+                detail: 'materiales registrados',
               ),
             ),
             const SizedBox(width: 12),
@@ -454,30 +485,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 22),
-        const SectionTitle('Intercambios'),
-        const InfoCard(
-          icon: Icons.swap_horiz,
-          title: 'Propón un producto y recibe una respuesta',
-          subtitle:
-              'En una publicación de intercambio puedes ofrecer un producto. La empresa que publicó decide si acepta o rechaza; puedes cancelar mientras siga pendiente.',
-          color: Color(0xFFEAF4EC),
-        ),
-        const SizedBox(height: 12),
-        _exchangeInbox(
-          title: 'Propuestas recibidas',
-          requests: incomingExchanges,
-          emptyMessage:
-              'Aún no hay propuestas. Publica un material en modalidad Intercambio para recibir ofertas de otras empresas.',
-        ),
-        const SizedBox(height: 10),
-        _exchangeInbox(
-          title: 'Propuestas enviadas',
-          requests: outgoingExchanges,
-          emptyMessage:
-              'Aquí verás el estado de las propuestas que envíes a otras empresas.',
-          outgoing: true,
         ),
         const SizedBox(height: 22),
         const SectionTitle('Materiales publicados'),
@@ -552,57 +559,20 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         _listings.removeWhere((item) => item.id == listing.id);
         _exchangeRequests.removeWhere((item) => item.listingId == listing.id);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Publicación eliminada.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Publicación eliminada.')));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo eliminar. Revisa tu conexión e inténtalo de nuevo.'),
+          content: Text(
+            'No se pudo eliminar. Revisa tu conexión e inténtalo de nuevo.',
+          ),
         ),
       );
     }
   }
-
-  Widget _exchangeInbox({
-    required String title,
-    required List<MaterialExchangeRequest> requests,
-    required String emptyMessage,
-    bool outgoing = false,
-  }) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFEBEFEA)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        if (requests.isEmpty)
-          Text(
-            emptyMessage,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF65736A)),
-          )
-        else
-          for (final request in requests) ...[
-            if (request != requests.first) const Divider(height: 20),
-            _exchangeRequestTile(
-              request,
-              allowCancel: outgoing,
-              listingTitle: _listings
-                  .where((listing) => listing.id == request.listingId)
-                  .map((listing) => listing.title)
-                  .firstOrNull,
-            ),
-          ],
-      ],
-    ),
-  );
 
   Widget _buildMaterialCard(MaterialListing listing) {
     final own = listing.companyId == _companyId;
@@ -624,19 +594,70 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _MaterialCard(listing: listing),
+          if (!own)
+            Align(
+              alignment: Alignment.centerRight,
+              child: listing.isLegacyLocal
+                  ? const Text(
+                      'Vuelve a publicar este material con sesión para abrir el chat.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
+                    )
+                  : listing.status != 'Disponible' &&
+                        listing.status != 'Intercambio'
+                  ? const Text(
+                      'Esta publicación ya no está disponible.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
+                    )
+                  : !BackendConfig.isInitialized
+                  ? const Text(
+                      'El chat cifrado requiere iniciar sesión con Supabase.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
+                    )
+                  : !WorkspaceRepository.hasSecureChatSchema
+                  ? const Text(
+                      'Ejecuta la migración de chat cifrado en Supabase.',
+                      style: TextStyle(fontSize: 11, color: Colors.deepOrange),
+                    )
+                  : TextButton.icon(
+                      onPressed: () => _contactListing(listing),
+                      icon: const Icon(Icons.lock_outline),
+                      label: const Text('Contactar empresa'),
+                    ),
+            ),
+          if (own && requests.isNotEmpty) ...[
+            const Divider(height: 18),
+            const Text(
+              'Propuestas recibidas',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+            for (final request in requests) _exchangeRequestTile(request),
+          ],
           if (own)
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _deleteListing(listing),
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: Color(0xFFB42318),
-                ),
-                label: const Text(
-                  'Eliminar publicación',
-                  style: TextStyle(color: Color(0xFFB42318)),
-                ),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: BackendConfig.isInitialized &&
+                            !listing.isLegacyLocal
+                        ? () => _contactListing(listing)
+                        : null,
+                    icon: const Icon(Icons.forum_outlined),
+                    label: const Text('Conversaciones'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _deleteListing(listing),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFB42318),
+                    ),
+                    label: const Text(
+                      'Eliminar publicación',
+                      style: TextStyle(color: Color(0xFFB42318)),
+                    ),
+                  ),
+                ],
               ),
             ),
           if (listing.exchangeFor?.isNotEmpty == true)
@@ -733,6 +754,461 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     ),
   );
 
+  Future<void> _contactListing(MaterialListing listing) async {
+    try {
+      if (listing.companyId == _companyId) {
+        final conversations =
+            await WorkspaceRepository.loadMaterialConversations(listing);
+        if (!mounted) return;
+        if (conversations.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Aún no hay conversaciones para esta publicación.'),
+            ),
+          );
+          return;
+        }
+        final selected = await showDialog<MaterialConversation>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Conversaciones de la publicación'),
+            content: SizedBox(
+              width: 420,
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final conversation in conversations)
+                    ListTile(
+                      leading: const CircleAvatar(
+                        child: Icon(Icons.business_outlined),
+                      ),
+                      title: Text(conversation.requesterCompanyName),
+                      subtitle: Text(
+                        'Inició ${_chatTime(conversation.createdAt)}',
+                      ),
+                      onTap: () => Navigator.pop(context, conversation),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        );
+        if (selected == null || !mounted) return;
+        await _showMaterialChat(
+          listing: listing,
+          conversationId: selected.id,
+          partnerCompanyId: selected.requesterCompanyId,
+          partnerName: selected.requesterCompanyName,
+        );
+        return;
+      }
+      final conversationId = await WorkspaceRepository.openMaterialConversation(
+        account: widget.account,
+        listing: listing,
+      );
+      if (!mounted) return;
+      await _showMaterialChat(
+        listing: listing,
+        conversationId: conversationId,
+        partnerCompanyId: listing.companyId,
+        partnerName: listing.companyName,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo abrir el chat. Revisa que aplicaste la migración de chat cifrado y que ambas empresas hayan iniciado sesión.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showMaterialChat({
+    required MaterialListing listing,
+    required String conversationId,
+    required String partnerCompanyId,
+    required String partnerName,
+  }) async {
+    final controller = TextEditingController();
+    var messages = <MaterialChatMessage>[];
+    var loading = true;
+    var initialLoadStarted = false;
+    var sending = false;
+    String? error;
+
+    Future<void> refresh(StateSetter setDialogState) async {
+      try {
+        final loaded = await WorkspaceRepository.loadMaterialChatMessages(
+          conversationId: conversationId,
+          account: widget.account,
+        );
+        setDialogState(() {
+          messages = loaded;
+          loading = false;
+          error = null;
+        });
+      } catch (_) {
+        setDialogState(() {
+          loading = false;
+          error = 'No se pudieron cargar los mensajes.';
+        });
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          if (loading && !initialLoadStarted) {
+            initialLoadStarted = true;
+            refresh(setDialogState);
+          }
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.lock_outline, color: Color(0xFF39815D)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(partnerName, maxLines: 1),
+                      Text(listing.title, style: const TextStyle(fontSize: 11)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Actualizar mensajes',
+                  onPressed: loading
+                      ? null
+                      : () {
+                          setDialogState(() => loading = true);
+                          refresh(setDialogState);
+                        },
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Mensajes de texto cifrados en este dispositivo. Solo se pueden enviar mensajes escritos.',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF65736A)),
+                  ),
+                  const SizedBox(height: 8),
+                  if (error != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        setDialogState(() => loading = true);
+                        refresh(setDialogState);
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: Text(error!),
+                    )
+                  else if (loading)
+                    const SizedBox(
+                      height: 250,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else
+                    SizedBox(
+                      height: 270,
+                      child: messages.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Inicia la conversación sobre este material.',
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: messages.length,
+                              itemBuilder: (context, index) {
+                                final message = messages[index];
+                                final mine =
+                                    message.senderCompanyId == _companyId;
+                                final bubble = Container(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 350,
+                                  ),
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: mine
+                                        ? const Color(0xFFDDF3E2)
+                                        : const Color(0xFFF0F2EF),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(message.body),
+                                      const SizedBox(height: 3),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Text(
+                                          _chatTime(message.createdAt),
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            color: Color(0xFF65736A),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return Align(
+                                  alignment: mine
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: mine || listing.companyId != _companyId
+                                      ? bubble
+                                      : PopupMenuButton<String>(
+                                          tooltip: 'Opciones de dirección',
+                                          onSelected: (value) {
+                                            if (value == 'route') {
+                                              _proposeDirectRoute(
+                                                listing: listing,
+                                                conversationId: conversationId,
+                                                partnerCompanyId:
+                                                    partnerCompanyId,
+                                                partnerName: partnerName,
+                                                quotedAddress: message.body,
+                                              );
+                                            }
+                                          },
+                                          itemBuilder: (context) => const [
+                                            PopupMenuItem(
+                                              value: 'route',
+                                              child: Text(
+                                                'Proponer ruta a este texto',
+                                              ),
+                                            ),
+                                          ],
+                                          child: bubble,
+                                        ),
+                                );
+                              },
+                            ),
+                    ),
+                  if (listing.companyId == _companyId) ...[
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      onPressed: () => _proposeDirectRoute(
+                        listing: listing,
+                        conversationId: conversationId,
+                        partnerCompanyId: partnerCompanyId,
+                        partnerName: partnerName,
+                      ),
+                      icon: const Icon(Icons.local_shipping_outlined),
+                      label: const Text('Proponer una ruta directa'),
+                    ),
+                  ],
+                  TextField(
+                    controller: controller,
+                    onChanged: (_) => setDialogState(() {}),
+                    maxLines: 2,
+                    maxLength: 1000,
+                    decoration: const InputDecoration(
+                      labelText: 'Mensaje',
+                      hintText: 'Escribe tu mensaje',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cerrar'),
+              ),
+              FilledButton.icon(
+                onPressed: sending || controller.text.trim().isEmpty
+                    ? null
+                    : () async {
+                        setDialogState(() => sending = true);
+                        try {
+                          await WorkspaceRepository.sendMaterialChatMessage(
+                            account: widget.account,
+                            conversationId: conversationId,
+                            recipientCompanyId: partnerCompanyId,
+                            body: controller.text,
+                          );
+                          controller.clear();
+                          setDialogState(() => loading = true);
+                          await refresh(setDialogState);
+                        } catch (_) {
+                          setDialogState(() {
+                            error = 'No se pudo enviar el mensaje cifrado.';
+                          });
+                        } finally {
+                          setDialogState(() => sending = false);
+                        }
+                      },
+                icon: const Icon(Icons.send_outlined),
+                label: Text(sending ? 'Enviando…' : 'Enviar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
+  }
+
+  String _chatTime(DateTime date) =>
+      '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _proposeDirectRoute({
+    required MaterialListing listing,
+    required String conversationId,
+    required String partnerCompanyId,
+    required String partnerName,
+    String quotedAddress = '',
+  }) async {
+    if (listing.companyId != _companyId) return;
+    final formKey = GlobalKey<FormState>();
+    final originAddress = TextEditingController();
+    final destinationAddress = TextEditingController(text: quotedAddress);
+    String? originCity;
+    String? destinationCity;
+    var transport = 'Camión';
+    final result = await showDialog<(String, String, String, String, String)?>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Proponer ruta a $partnerName'),
+          scrollable: true,
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ColombianCityField(onChanged: (value) => originCity = value),
+                TextFormField(
+                  controller: originAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección de recogida',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Especifica la recogida'
+                      : null,
+                ),
+                const SizedBox(height: 10),
+                ColombianCityField(
+                  onChanged: (value) => destinationCity = value,
+                ),
+                TextFormField(
+                  controller: destinationAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección indicada en el chat',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Especifica la dirección de entrega'
+                      : null,
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: transport,
+                  decoration: const InputDecoration(
+                    labelText: 'Medio de transporte',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Camión', child: Text('Camión')),
+                    DropdownMenuItem(
+                      value: 'Tractocamión',
+                      child: Text('Tractocamión'),
+                    ),
+                    DropdownMenuItem(value: 'Furgón', child: Text('Furgón')),
+                    DropdownMenuItem(value: 'Tren', child: Text('Tren')),
+                    DropdownMenuItem(value: 'Buque', child: Text('Buque')),
+                    DropdownMenuItem(value: 'Avión', child: Text('Avión')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setDialogState(() => transport = value);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate() ||
+                    originCity == null ||
+                    destinationCity == null) {
+                  return;
+                }
+                Navigator.pop(dialogContext, (
+                  originCity!,
+                  originAddress.text.trim(),
+                  destinationCity!,
+                  destinationAddress.text.trim(),
+                  transport,
+                ));
+              },
+              child: const Text('Enviar propuesta de ruta'),
+            ),
+          ],
+        ),
+      ),
+    );
+    originAddress.dispose();
+    destinationAddress.dispose();
+    if (result == null || !mounted) return;
+    try {
+      await WorkspaceRepository.requestRoute(
+        account: widget.account,
+        origin: result.$1,
+        originAddress: result.$2,
+        destination: result.$3,
+        destinationAddress: result.$4,
+        transportType: result.$5,
+        recipientCompanyId: partnerCompanyId,
+        deliveryType: 'Materiales',
+        cargoDescription:
+            '${listing.title} · ${listing.quantity} ${listing.unit}',
+        travelDate: DateTime.now().add(const Duration(days: 1)),
+      );
+      await WorkspaceRepository.sendMaterialChatMessage(
+        account: widget.account,
+        conversationId: conversationId,
+        recipientCompanyId: partnerCompanyId,
+        body:
+            'Te propongo una ruta directa para ${listing.title}: recogida en ${result.$2}, entrega en ${result.$4}. Transporte: ${result.$5}. Revisa la propuesta en Rutas.',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Propuesta de ruta enviada.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo enviar la propuesta de ruta.'),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _proposeExchange(MaterialListing listing) async {
     List<InventoryItem> inventory;
     try {
@@ -775,13 +1251,12 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     }
 
     final formKey = GlobalKey<FormState>();
-    final message = TextEditingController();
     final quantity = TextEditingController(
       text: inventory.first.quantity.toString(),
     );
     var selectedItem = inventory.first;
     if (!mounted) return;
-    final result = await showDialog<(InventoryItem, double, String)?>(
+    final result = await showDialog<(InventoryItem, double)?>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
@@ -852,14 +1327,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: message,
-                  decoration: const InputDecoration(
-                    labelText: 'Mensaje (opcional)',
-                  ),
-                  maxLines: 2,
-                ),
               ],
             ),
           ),
@@ -874,7 +1341,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                 Navigator.pop(dialogContext, (
                   selectedItem,
                   double.parse(quantity.text.trim().replaceAll(',', '.')),
-                  message.text.trim(),
                 ));
               },
               child: const Text('Enviar propuesta'),
@@ -892,7 +1358,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         offeredProduct: result.$1.name,
         offeredQuantity: result.$2,
         offeredUnit: result.$1.unit,
-        message: result.$3,
       );
       await _load();
       if (mounted) {
@@ -906,8 +1371,6 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
           const SnackBar(content: Text('No se pudo enviar la propuesta.')),
         );
       }
-    } finally {
-      message.dispose();
     }
   }
 

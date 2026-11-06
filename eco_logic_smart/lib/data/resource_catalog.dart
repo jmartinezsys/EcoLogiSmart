@@ -118,6 +118,49 @@ class ResourceCatalog {
   static List<String> productsFor(String category) =>
       productsByCategory[category] ?? const [];
 
+  static String categoryForProduct(String product) {
+    for (final entry in productsByCategory.entries) {
+      if (entry.value.contains(product)) return entry.key;
+    }
+    return 'Otro';
+  }
+
+  static List<String> unitsForCategory(String category) => switch (category) {
+    'Papel y cartón' => [
+      'unidades',
+      'kg',
+      'toneladas',
+      'pacas',
+      'rollos',
+      'cajas',
+      'm²',
+      'm³',
+    ],
+    'Metales' || 'Construcción' => [
+      'unidades',
+      'kg',
+      'toneladas',
+      'metros',
+      'cm de diámetro',
+      'm³',
+    ],
+    'Plásticos' => ['unidades', 'kg', 'toneladas', 'pacas', 'rollos', 'm³'],
+    'Vidrio' => ['unidades', 'kg', 'toneladas', 'cajas', 'm²', 'm³'],
+    'Madera' => [
+      'unidades',
+      'estibas',
+      'metros',
+      'm²',
+      'm³',
+      'kg',
+      'toneladas',
+    ],
+    'Aceites usados' ||
+    'Agua y energía' => ['litros', 'm³', 'kg', 'toneladas', 'kWh'],
+    'Textiles' => ['unidades', 'kg', 'toneladas', 'metros', 'rollos', 'pacas'],
+    _ => units,
+  };
+
   static List<String> get allProducts =>
       productsByCategory.values.expand((products) => products).toSet().toList()
         ..sort();

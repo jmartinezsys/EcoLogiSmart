@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
+import '../../data/resource_catalog.dart';
 import '../../services/backend_config.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
@@ -61,89 +62,317 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
   }
 
   Future<void> _requestRoute() async {
+    var inventory = <InventoryItem>[];
+    try {
+      inventory = await WorkspaceRepository.loadInventory(widget.account);
+    } catch (_) {
+      // A route can still be described from the catalog when no inventory loads.
+    }
     final formKey = GlobalKey<FormState>();
     String? origin;
     String? destination;
-    final cargo = TextEditingController();
+    final cargoQuantity = TextEditingController(text: '1');
+    final customCargoProduct = TextEditingController();
+    final originAddress = TextEditingController();
+    final destinationAddress = TextEditingController();
+    var selectedCargoProduct = inventory.isEmpty
+        ? ResourceCatalog.allProducts.first
+        : inventory.first.name;
+    var customCargo = false;
+    var cargoUnit = inventory.isEmpty
+        ? ResourceCatalog.unitsForCategory(
+            ResourceCatalog.categoryForProduct(
+              ResourceCatalog.allProducts.first,
+            ),
+          ).first
+        : inventory.first.unit;
+
+    List<String> cargoUnits() {
+      final matched = inventory.where(
+        (item) => item.name == selectedCargoProduct,
+      );
+      final category = matched.isNotEmpty && matched.first.category.isNotEmpty
+          ? matched.first.category
+          : ResourceCatalog.categoryForProduct(selectedCargoProduct);
+      final units = ResourceCatalog.unitsForCategory(category).toList();
+      if (matched.isNotEmpty && !units.contains(matched.first.unit)) {
+        units.insert(0, matched.first.unit);
+      }
+      return units;
+    }
+
+    String cargoCategory() {
+      if (customCargo) return 'Otro';
+      final matched = inventory.where(
+        (item) => item.name == selectedCargoProduct,
+      );
+      if (matched.isNotEmpty && matched.first.category.isNotEmpty) {
+        return matched.first.category;
+      }
+      return ResourceCatalog.categoryForProduct(selectedCargoProduct);
+    }
+
     var deliveryType = 'Materiales';
+    var transportType = 'Camión';
     var travelDate = DateTime.now().add(const Duration(days: 1));
+    if (!mounted) return;
     final result =
-        await showDialog<(String, String, String, String, DateTime)?>(
+        await showDialog<
+          (String, String, String, String, String, String, String, DateTime)?
+        >(
           context: context,
           builder: (dialogContext) => StatefulBuilder(
             builder: (dialogContext, setDialogState) => AlertDialog(
               title: const Text('Publicar una ruta compartida'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ColombianCityField(
-                      key: const ValueKey('route-origin'),
-                      onChanged: (value) => origin = value,
-                    ),
-                    const SizedBox(height: 12),
-                    ColombianCityField(
-                      key: const ValueKey('route-destination'),
-                      onChanged: (value) => destination = value,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: deliveryType,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de entrega',
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ColombianCityField(
+                        key: const ValueKey('route-origin'),
+                        onChanged: (value) => origin = value,
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Paquetes',
-                          child: Text('Paquetes'),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: originAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Dirección exacta de origen',
+                          hintText: 'Vía, número, barrio, bodega o muelle',
                         ),
-                        DropdownMenuItem(
-                          value: 'Insumos',
-                          child: Text('Insumos'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Materiales',
-                          child: Text('Materiales'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => deliveryType = value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: cargo,
-                      decoration: const InputDecoration(
-                        labelText: 'Carga o capacidad disponible',
-                        hintText: 'Ej. 2 toneladas de cartón',
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'Especifica la dirección de recogida'
+                            : null,
                       ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Describe la carga o capacidad'
-                          : null,
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final selected = await showDatePicker(
-                          context: dialogContext,
-                          initialDate: travelDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
+                      const SizedBox(height: 12),
+                      ColombianCityField(
+                        key: const ValueKey('route-destination'),
+                        onChanged: (value) => destination = value,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: destinationAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Dirección exacta de entrega',
+                          hintText: 'Vía, número, barrio, bodega o terminal',
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'Especifica la dirección de entrega'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: transportType,
+                        decoration: const InputDecoration(
+                          labelText: 'Medio de transporte',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Camión',
+                            child: Text('Camión'),
                           ),
-                        );
-                        if (selected != null) {
-                          setDialogState(() => travelDate = selected);
-                        }
-                      },
-                      icon: const Icon(Icons.calendar_month_outlined),
-                      label: Text('Fecha: ${_dateLabel(travelDate)}'),
-                    ),
-                  ],
+                          DropdownMenuItem(
+                            value: 'Tractocamión',
+                            child: Text('Tractocamión'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Furgón',
+                            child: Text('Furgón'),
+                          ),
+                          DropdownMenuItem(value: 'Tren', child: Text('Tren')),
+                          DropdownMenuItem(
+                            value: 'Buque',
+                            child: Text('Buque'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Avión',
+                            child: Text('Avión'),
+                          ),
+                          DropdownMenuItem(value: 'Otro', child: Text('Otro')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => transportType = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: deliveryType,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de entrega',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Paquetes',
+                            child: Text('Paquetes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Insumos',
+                            child: Text('Insumos'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Materiales',
+                            child: Text('Materiales'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => deliveryType = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: customCargo
+                            ? '__otro__'
+                            : selectedCargoProduct,
+                        decoration: const InputDecoration(
+                          labelText: 'Material de la carga',
+                        ),
+                        items: [
+                          ...{
+                            ...ResourceCatalog.allProducts,
+                            ...inventory.map((item) => item.name),
+                          }.map(
+                            (product) => DropdownMenuItem(
+                              value: product,
+                              child: Text(
+                                product,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          const DropdownMenuItem(
+                            value: '__otro__',
+                            child: Text('Otro material…'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            customCargo = value == '__otro__';
+                            if (customCargo) {
+                              cargoUnit = ResourceCatalog.unitsForCategory(
+                                'Otro',
+                              ).first;
+                            } else {
+                              selectedCargoProduct = value;
+                              final matched = inventory.where(
+                                (item) => item.name == value,
+                              );
+                              cargoUnit = matched.isNotEmpty
+                                  ? matched.first.unit
+                                  : cargoUnits().first;
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      if (customCargo)
+                        TextFormField(
+                          controller: customCargoProduct,
+                          decoration: const InputDecoration(
+                            labelText: 'Escribe el material',
+                          ),
+                          validator: (value) =>
+                              customCargo &&
+                                  (value == null || value.trim().isEmpty)
+                              ? 'Escribe el material'
+                              : null,
+                        ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Categoría: ${cargoCategory()}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF65736A),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: cargoQuantity,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'Cantidad',
+                              ),
+                              validator: (value) {
+                                final amount = double.tryParse(
+                                  (value ?? '').trim().replaceAll(',', '.'),
+                                );
+                                return amount == null || amount <= 0
+                                    ? 'Usa una cantidad mayor que cero'
+                                    : null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: cargoUnit,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Unidad',
+                              ),
+                              items: cargoUnits()
+                                  .map(
+                                    (unit) => DropdownMenuItem(
+                                      value: unit,
+                                      child: Text(
+                                        unit,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setDialogState(() => cargoUnit = value);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'La distancia y el tiempo estimado requieren conectar un servicio de mapas; todavía no hay uno configurado.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF65736A),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final selected = await showDatePicker(
+                            context: dialogContext,
+                            initialDate: travelDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                          );
+                          if (selected != null) {
+                            setDialogState(() => travelDate = selected);
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        label: Text('Fecha: ${_dateLabel(travelDate)}'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -155,11 +384,20 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                   onPressed: () {
                     if (!formKey.currentState!.validate()) return;
                     if (origin == null || destination == null) return;
+                    final cargoAmount = double.parse(
+                      cargoQuantity.text.trim().replaceAll(',', '.'),
+                    );
+                    final cargoName = customCargo
+                        ? customCargoProduct.text.trim()
+                        : selectedCargoProduct;
                     Navigator.pop(dialogContext, (
                       origin!,
+                      originAddress.text.trim(),
                       destination!,
+                      destinationAddress.text.trim(),
+                      transportType,
                       deliveryType,
-                      cargo.text.trim(),
+                      '$cargoAmount $cargoUnit de $cargoName (${cargoCategory()})',
                       travelDate,
                     ));
                   },
@@ -169,7 +407,10 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             ),
           ),
         );
-    cargo.dispose();
+    cargoQuantity.dispose();
+    customCargoProduct.dispose();
+    originAddress.dispose();
+    destinationAddress.dispose();
     if (result == null || !mounted) {
       return;
     }
@@ -178,10 +419,13 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
       await WorkspaceRepository.requestRoute(
         account: widget.account,
         origin: result.$1,
-        destination: result.$2,
-        deliveryType: result.$3,
-        cargoDescription: result.$4,
-        travelDate: result.$5,
+        originAddress: result.$2,
+        destination: result.$3,
+        destinationAddress: result.$4,
+        transportType: result.$5,
+        deliveryType: result.$6,
+        cargoDescription: result.$7,
+        travelDate: result.$8,
       );
       await _load();
       if (mounted) {
@@ -393,9 +637,19 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '${route.companyName} · ${route.deliveryType}$date',
+            '${route.companyName} · ${route.transportType} · ${route.deliveryType}$date',
             style: const TextStyle(fontSize: 12, color: Color(0xFF59665D)),
           ),
+          if (route.originAddress.isNotEmpty)
+            Text(
+              'Recogida: ${route.originAddress}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          if (route.destinationAddress.isNotEmpty)
+            Text(
+              'Entrega: ${route.destinationAddress}',
+              style: const TextStyle(fontSize: 12),
+            ),
           if (route.cargoDescription.isNotEmpty)
             Text(
               'Carga/capacidad: ${route.cargoDescription}',
@@ -405,6 +659,27 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             'Estado: ${route.status}',
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
+          if (route.recipientCompanyId == _companyId &&
+              route.status == 'Abierta') ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Esta propuesta de ruta se envió directamente a tu empresa.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF39815D)),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilledButton.tonal(
+                  onPressed: () => _setRouteStatus(route, 'En coordinación'),
+                  child: const Text('Aceptar propuesta'),
+                ),
+                TextButton(
+                  onPressed: () => _setRouteStatus(route, 'Cancelada'),
+                  child: const Text('Rechazar'),
+                ),
+              ],
+            ),
+          ],
           if (own &&
               route.status != 'Completada' &&
               route.status != 'Cancelada')
@@ -427,7 +702,10 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                 ),
               ],
             ),
-          if (!own && route.status == 'Abierta' && activeMine.isEmpty)
+          if (!own &&
+              route.recipientCompanyId == null &&
+              route.status == 'Abierta' &&
+              activeMine.isEmpty)
             Align(
               alignment: Alignment.centerRight,
               child:

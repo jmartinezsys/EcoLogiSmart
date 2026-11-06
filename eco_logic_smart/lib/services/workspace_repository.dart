@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/company_account.dart';
 import '../models/operational_records.dart';
 import 'backend_config.dart';
+import 'end_to_end_chat.dart';
 
 class WorkspaceRepository {
   WorkspaceRepository._();
@@ -23,6 +24,8 @@ class WorkspaceRepository {
       !_missingSchemaTables.contains('material_exchange_requests');
   static bool get hasRouteSharingSchema =>
       !_missingSchemaTables.contains('route_join_requests');
+  static bool get hasSecureChatSchema =>
+      !_missingSchemaTables.contains('material_chat_messages');
 
   static bool get _cloud => BackendConfig.isRequested;
   static String _ownerId(CompanyAccount account) => _cloud
@@ -314,6 +317,128 @@ class WorkspaceRepository {
     await preferences.setString(_exchangesKey, jsonEncode(rows));
   }
 
+  static Future<void> ensureChatIdentity() async {
+    if (_cloud && BackendConfig.isInitialized) {
+      await EndToEndChat.ensureRegistered();
+    }
+  }
+
+  static Future<String> openMaterialConversation({
+    required CompanyAccount account,
+    required MaterialListing listing,
+  }) async {
+    if (!_cloud || !BackendConfig.isInitialized) {
+      throw StateError(
+        'El chat cifrado requiere una sesión conectada a Supabase.',
+      );
+    }
+    try {
+      await ensureChatIdentity();
+      final response = await BackendConfig.client.rpc(
+        'open_material_conversation',
+        params: {'p_listing_id': listing.id},
+      );
+      _missingSchemaTables.remove('material_chat_messages');
+      return response as String;
+    } on PostgrestException catch (error) {
+      if (error.code == 'PGRST202' ||
+          error.code == 'PGRST205' ||
+          error.code == '42P01') {
+        _missingSchemaTables.add('material_chat_messages');
+      }
+      rethrow;
+    }
+  }
+
+  static Future<List<MaterialConversation>> loadMaterialConversations(
+    MaterialListing listing,
+  ) async {
+    try {
+      final rows = await BackendConfig.client
+          .from('material_conversations')
+          .select()
+          .eq('listing_id', listing.id)
+          .order('created_at', ascending: false);
+      return rows.map((row) => MaterialConversation.fromJson(row)).toList();
+    } on PostgrestException catch (error) {
+      if (error.code == 'PGRST205' || error.code == '42P01') {
+        _missingSchemaTables.add('material_chat_messages');
+      }
+      rethrow;
+    }
+  }
+
+  static Future<List<MaterialChatMessage>> loadMaterialChatMessages({
+    required String conversationId,
+    required CompanyAccount account,
+  }) async {
+    if (!_cloud || !BackendConfig.isInitialized) {
+      throw StateError('El chat cifrado requiere Supabase.');
+    }
+    await ensureChatIdentity();
+    final rows = await BackendConfig.client
+        .from('material_chat_messages')
+        .select('id,sender_company_id,encrypted_payload,created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at');
+    final result = <MaterialChatMessage>[];
+    for (final row in rows) {
+      final senderId = row['sender_company_id'] as String;
+      final payload = Map<String, dynamic>.from(
+        row['encrypted_payload'] as Map,
+      );
+      final envelopes = Map<String, dynamic>.from(payload['envelopes'] as Map);
+      final envelope = Map<String, dynamic>.from(
+        envelopes[_ownerId(account)] as Map,
+      );
+      String body;
+      try {
+        body = await EndToEndChat.decryptEnvelope(
+          conversationId: conversationId,
+          senderId: senderId,
+          recipientId: _ownerId(account),
+          envelope: envelope,
+        );
+      } catch (_) {
+        body = 'No se pudo descifrar este mensaje en este dispositivo.';
+      }
+      result.add(
+        MaterialChatMessage(
+          id: row['id'] as String,
+          senderCompanyId: senderId,
+          body: body,
+          createdAt:
+              DateTime.tryParse(row['created_at'] as String) ?? DateTime.now(),
+        ),
+      );
+    }
+    _missingSchemaTables.remove('material_chat_messages');
+    return result;
+  }
+
+  static Future<void> sendMaterialChatMessage({
+    required CompanyAccount account,
+    required String conversationId,
+    required String recipientCompanyId,
+    required String body,
+  }) async {
+    if (!_cloud || !BackendConfig.isInitialized) {
+      throw StateError('El chat cifrado requiere Supabase.');
+    }
+    final senderId = _ownerId(account);
+    final payload = await EndToEndChat.encryptForParticipants(
+      conversationId: conversationId,
+      senderId: senderId,
+      recipientId: recipientCompanyId,
+      plaintext: body.trim(),
+    );
+    await BackendConfig.client.from('material_chat_messages').insert({
+      'conversation_id': conversationId,
+      'sender_company_id': senderId,
+      'encrypted_payload': payload,
+    });
+  }
+
   static Future<void> updateExchangeStatus(
     MaterialExchangeRequest request,
     String status,
@@ -375,7 +500,11 @@ class WorkspaceRepository {
   static Future<void> requestRoute({
     required CompanyAccount account,
     String origin = '',
+    String originAddress = '',
     required String destination,
+    String destinationAddress = '',
+    String transportType = 'Camión',
+    String? recipientCompanyId,
     required String deliveryType,
     String cargoDescription = '',
     DateTime? travelDate,
@@ -385,6 +514,10 @@ class WorkspaceRepository {
       'destination': destination,
       'delivery_type': deliveryType,
       'origin': origin,
+      'origin_address': originAddress,
+      'destination_address': destinationAddress,
+      'transport_type': transportType,
+      'recipient_company_id': recipientCompanyId,
       'cargo_description': cargoDescription,
       'travel_date': travelDate?.toIso8601String().split('T').first,
       'status': 'Abierta',
@@ -479,6 +612,14 @@ class WorkspaceRepository {
     String status,
   ) async {
     if (_cloud) {
+      if (route.recipientCompanyId ==
+          BackendConfig.client.auth.currentUser?.id) {
+        await BackendConfig.client.rpc(
+          'respond_direct_route_proposal',
+          params: {'p_route_id': route.id, 'p_status': status},
+        );
+        return;
+      }
       await BackendConfig.client
           .from('logistics_requests')
           .update({'status': status})

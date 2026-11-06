@@ -6,6 +6,7 @@ import 'features/indicators/indicators_workspace_screen.dart';
 import 'features/logistics/logistics_workspace_screen.dart';
 import 'features/resources/resources_screen.dart';
 import 'models/company_account.dart';
+import 'services/workspace_repository.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.account});
@@ -25,6 +26,15 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _account = widget.account;
+    _registerChatIdentity();
+  }
+
+  Future<void> _registerChatIdentity() async {
+    try {
+      await WorkspaceRepository.ensureChatIdentity();
+    } catch (_) {
+      // Chat identity setup must not block access to the rest of the app.
+    }
   }
 
   void _selectTab(int index) {

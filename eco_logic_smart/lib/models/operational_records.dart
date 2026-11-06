@@ -157,6 +157,51 @@ class MaterialExchangeRequest {
   };
 }
 
+class MaterialConversation {
+  const MaterialConversation({
+    required this.id,
+    required this.listingId,
+    required this.requesterCompanyId,
+    required this.requesterCompanyName,
+    required this.publisherCompanyId,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String listingId;
+  final String requesterCompanyId;
+  final String requesterCompanyName;
+  final String publisherCompanyId;
+  final DateTime createdAt;
+
+  factory MaterialConversation.fromJson(Map<String, dynamic> json) =>
+      MaterialConversation(
+        id: json['id'] as String? ?? '',
+        listingId: json['listing_id'] as String? ?? '',
+        requesterCompanyId: json['requester_company_id'] as String? ?? '',
+        requesterCompanyName:
+            json['requester_company_name'] as String? ?? 'Empresa',
+        publisherCompanyId: json['publisher_company_id'] as String? ?? '',
+        createdAt:
+            DateTime.tryParse(json['created_at'] as String? ?? '') ??
+            DateTime.now(),
+      );
+}
+
+class MaterialChatMessage {
+  const MaterialChatMessage({
+    required this.id,
+    required this.senderCompanyId,
+    required this.body,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String senderCompanyId;
+  final String body;
+  final DateTime createdAt;
+}
+
 class RouteJoinRequest {
   const RouteJoinRequest({
     required this.id,
@@ -200,6 +245,10 @@ class LogisticsRequest {
     required this.deliveryType,
     required this.createdAt,
     this.origin = '',
+    this.originAddress = '',
+    this.destinationAddress = '',
+    this.transportType = 'Camión',
+    this.recipientCompanyId,
     this.cargoDescription = '',
     this.status = 'Abierta',
     this.travelDate,
@@ -212,6 +261,10 @@ class LogisticsRequest {
   final String deliveryType;
   final DateTime createdAt;
   final String origin;
+  final String originAddress;
+  final String destinationAddress;
+  final String transportType;
+  final String? recipientCompanyId;
   final String cargoDescription;
   final String status;
   final DateTime? travelDate;
@@ -227,6 +280,10 @@ class LogisticsRequest {
             DateTime.tryParse(json['created_at'] as String? ?? '') ??
             DateTime.now(),
         origin: json['origin'] as String? ?? '',
+        originAddress: json['origin_address'] as String? ?? '',
+        destinationAddress: json['destination_address'] as String? ?? '',
+        transportType: json['transport_type'] as String? ?? 'Camión',
+        recipientCompanyId: json['recipient_company_id'] as String?,
         cargoDescription: json['cargo_description'] as String? ?? '',
         status: json['status'] as String? ?? 'Abierta',
         travelDate: DateTime.tryParse(json['travel_date'] as String? ?? ''),
@@ -236,6 +293,10 @@ class LogisticsRequest {
     'destination': destination,
     'delivery_type': deliveryType,
     'origin': origin,
+    'origin_address': originAddress,
+    'destination_address': destinationAddress,
+    'transport_type': transportType,
+    'recipient_company_id': recipientCompanyId,
     'cargo_description': cargoDescription,
     'travel_date': travelDate?.toIso8601String(),
     'status': status,
