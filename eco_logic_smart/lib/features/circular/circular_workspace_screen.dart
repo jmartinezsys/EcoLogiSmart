@@ -5,6 +5,7 @@ import '../../data/resource_catalog.dart';
 import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
 import '../../services/backend_config.dart';
+import '../../services/osm_routing_service.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 import '../../shared/colombian_city_field.dart';
@@ -521,9 +522,14 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     );
   }
 
-  String get _companyId => widget.account.id.isNotEmpty
-      ? widget.account.id
-      : widget.account.email.toLowerCase();
+  String get _companyId {
+    if (BackendConfig.isInitialized) {
+      return BackendConfig.client.auth.currentUser?.id ?? widget.account.id;
+    }
+    return widget.account.id.isNotEmpty
+        ? widget.account.id
+        : widget.account.email.toLowerCase();
+  }
 
   Future<void> _deleteListing(MaterialListing listing) async {
     final confirmed = await showDialog<bool>(
@@ -577,7 +583,11 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   Widget _buildMaterialCard(MaterialListing listing) {
     final own = listing.companyId == _companyId;
     final requests = _exchangeRequests
-        .where((request) => request.listingId == listing.id)
+        .where(
+          (request) =>
+              request.listingId == listing.id &&
+              request.requesterCompanyId != listing.companyId,
+        )
         .toList();
     final myRequests = requests
         .where((request) => request.requesterCompanyId == _companyId)
@@ -639,8 +649,8 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
                 alignment: WrapAlignment.end,
                 children: [
                   TextButton.icon(
-                    onPressed: BackendConfig.isInitialized &&
-                            !listing.isLegacyLocal
+                    onPressed:
+                        BackendConfig.isInitialized && !listing.isLegacyLocal
                         ? () => _contactListing(listing)
                         : null,
                     icon: const Icon(Icons.forum_outlined),
@@ -758,7 +768,12 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     try {
       if (listing.companyId == _companyId) {
         final conversations =
-            await WorkspaceRepository.loadMaterialConversations(listing);
+            (await WorkspaceRepository.loadMaterialConversations(listing))
+                .where(
+                  (conversation) =>
+                      conversation.requesterCompanyId != _companyId,
+                )
+                .toList();
         if (!mounted) return;
         if (conversations.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1085,90 +1100,249 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
     String? originCity;
     String? destinationCity;
     var transport = 'Camión';
-    final result = await showDialog<(String, String, String, String, String)?>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text('Proponer ruta a $partnerName'),
-          scrollable: true,
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ColombianCityField(onChanged: (value) => originCity = value),
-                TextFormField(
-                  controller: originAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Dirección de recogida',
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Especifica la recogida'
-                      : null,
-                ),
-                const SizedBox(height: 10),
-                ColombianCityField(
-                  onChanged: (value) => destinationCity = value,
-                ),
-                TextFormField(
-                  controller: destinationAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Dirección indicada en el chat',
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Especifica la dirección de entrega'
-                      : null,
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: transport,
-                  decoration: const InputDecoration(
-                    labelText: 'Medio de transporte',
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Camión', child: Text('Camión')),
-                    DropdownMenuItem(
-                      value: 'Tractocamión',
-                      child: Text('Tractocamión'),
+    var routeOptions = <RouteEstimate>[];
+    RouteEstimate? selectedRoute;
+    var calculatingRoute = false;
+    String? routeError;
+    final result =
+        await showDialog<
+          (String, String, String, String, String, RouteEstimate?)?
+        >(
+          context: context,
+          builder: (dialogContext) => StatefulBuilder(
+            builder: (dialogContext, setDialogState) => AlertDialog(
+              title: Text('Proponer ruta a $partnerName'),
+              scrollable: true,
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ColombianCityField(
+                      onChanged: (value) {
+                        originCity = value;
+                        setDialogState(() {
+                          routeOptions = [];
+                          selectedRoute = null;
+                        });
+                      },
                     ),
-                    DropdownMenuItem(value: 'Furgón', child: Text('Furgón')),
-                    DropdownMenuItem(value: 'Tren', child: Text('Tren')),
-                    DropdownMenuItem(value: 'Buque', child: Text('Buque')),
-                    DropdownMenuItem(value: 'Avión', child: Text('Avión')),
+                    TextFormField(
+                      controller: originAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Dirección de recogida',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Especifica la recogida'
+                          : null,
+                      onChanged: (_) => setDialogState(() {
+                        routeOptions = [];
+                        selectedRoute = null;
+                      }),
+                    ),
+                    const SizedBox(height: 10),
+                    ColombianCityField(
+                      onChanged: (value) {
+                        destinationCity = value;
+                        setDialogState(() {
+                          routeOptions = [];
+                          selectedRoute = null;
+                        });
+                      },
+                    ),
+                    TextFormField(
+                      controller: destinationAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Dirección indicada en el chat',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Especifica la dirección de entrega'
+                          : null,
+                      onChanged: (_) => setDialogState(() {
+                        routeOptions = [];
+                        selectedRoute = null;
+                      }),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: transport,
+                      decoration: const InputDecoration(
+                        labelText: 'Medio de transporte',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Camión',
+                          child: Text('Camión'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Tractocamión',
+                          child: Text('Tractocamión'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Furgón',
+                          child: Text('Furgón'),
+                        ),
+                        DropdownMenuItem(value: 'Tren', child: Text('Tren')),
+                        DropdownMenuItem(value: 'Buque', child: Text('Buque')),
+                        DropdownMenuItem(value: 'Avión', child: Text('Avión')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() {
+                            transport = value;
+                            if (!{
+                              'Camión',
+                              'Tractocamión',
+                              'Furgón',
+                            }.contains(value)) {
+                              routeOptions = [];
+                              selectedRoute = null;
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed:
+                          calculatingRoute ||
+                              originCity == null ||
+                              destinationCity == null ||
+                              originAddress.text.trim().isEmpty ||
+                              destinationAddress.text.trim().isEmpty ||
+                              !{
+                                'Camión',
+                                'Tractocamión',
+                                'Furgón',
+                              }.contains(transport)
+                          ? null
+                          : () async {
+                              setDialogState(() {
+                                calculatingRoute = true;
+                                routeError = null;
+                              });
+                              try {
+                                final options =
+                                    await OsmRoutingService.findRoadRoutes(
+                                      originCity: originCity!,
+                                      originAddress: originAddress.text.trim(),
+                                      destinationCity: destinationCity!,
+                                      destinationAddress: destinationAddress
+                                          .text
+                                          .trim(),
+                                    );
+                                setDialogState(() {
+                                  routeOptions = options;
+                                  selectedRoute = options.first;
+                                });
+                              } catch (error) {
+                                setDialogState(() {
+                                  routeError = error.toString().replaceFirst(
+                                    'Bad state: ',
+                                    '',
+                                  );
+                                });
+                              } finally {
+                                setDialogState(() => calculatingRoute = false);
+                              }
+                            },
+                      icon: calculatingRoute
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.alt_route),
+                      label: Text(
+                        calculatingRoute
+                            ? 'Calculando rutas…'
+                            : 'Calcular rutas y ETA',
+                      ),
+                    ),
+                    if (routeError != null)
+                      Text(
+                        routeError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    if (routeOptions.isNotEmpty)
+                      DropdownButtonFormField<int>(
+                        initialValue: selectedRoute?.option,
+                        decoration: const InputDecoration(
+                          labelText: 'Selecciona una ruta terrestre',
+                        ),
+                        items: routeOptions
+                            .map(
+                              (option) => DropdownMenuItem(
+                                value: option.option,
+                                child: Text(
+                                  'Opción ${option.option} · ${option.distanceLabel} · ${option.durationLabel}',
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            selectedRoute = routeOptions.firstWhere(
+                              (option) => option.option == value,
+                            );
+                          });
+                        },
+                      ),
+                    if (selectedRoute != null)
+                      Text(
+                        'Tiempo aproximado: ${selectedRoute!.durationLabel} · ${selectedRoute!.distanceLabel}. Sin tráfico en vivo.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF39815D),
+                        ),
+                      ),
+                    const Text(
+                      'Perfil vial estándar: no incluye tráfico en vivo ni restricciones de peso/altura. Buque, avión y tren no tienen ETA aquí.',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF65736A)),
+                    ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) setDialogState(() => transport = value);
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (!formKey.currentState!.validate() ||
+                        originCity == null ||
+                        destinationCity == null) {
+                      return;
+                    }
+                    if ({
+                          'Camión',
+                          'Tractocamión',
+                          'Furgón',
+                        }.contains(transport) &&
+                        selectedRoute == null) {
+                      setDialogState(
+                        () => routeError = 'Calcula y selecciona una ruta.',
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext, (
+                      originCity!,
+                      originAddress.text.trim(),
+                      destinationCity!,
+                      destinationAddress.text.trim(),
+                      transport,
+                      selectedRoute,
+                    ));
                   },
+                  child: const Text('Enviar propuesta de ruta'),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate() ||
-                    originCity == null ||
-                    destinationCity == null) {
-                  return;
-                }
-                Navigator.pop(dialogContext, (
-                  originCity!,
-                  originAddress.text.trim(),
-                  destinationCity!,
-                  destinationAddress.text.trim(),
-                  transport,
-                ));
-              },
-              child: const Text('Enviar propuesta de ruta'),
-            ),
-          ],
-        ),
-      ),
-    );
+        );
     originAddress.dispose();
     destinationAddress.dispose();
     if (result == null || !mounted) return;
@@ -1185,13 +1359,16 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
         cargoDescription:
             '${listing.title} · ${listing.quantity} ${listing.unit}',
         travelDate: DateTime.now().add(const Duration(days: 1)),
+        estimatedDistanceMeters: result.$6?.distanceMeters,
+        estimatedDurationSeconds: result.$6?.durationSeconds,
+        routeOption: result.$6?.option,
       );
       await WorkspaceRepository.sendMaterialChatMessage(
         account: widget.account,
         conversationId: conversationId,
         recipientCompanyId: partnerCompanyId,
         body:
-            'Te propongo una ruta directa para ${listing.title}: recogida en ${result.$2}, entrega en ${result.$4}. Transporte: ${result.$5}. Revisa la propuesta en Rutas.',
+            'Te propongo una ruta directa para ${listing.title}: recogida en ${result.$2}, entrega en ${result.$4}. Transporte: ${result.$5}.${result.$6 == null ? '' : ' ETA aprox. ${result.$6!.durationLabel}, ${result.$6!.distanceLabel}.'} Revisa la propuesta en Rutas.',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1210,6 +1387,14 @@ class _CircularWorkspaceScreenState extends State<CircularWorkspaceScreen> {
   }
 
   Future<void> _proposeExchange(MaterialListing listing) async {
+    if (listing.companyId == _companyId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo puedes intercambiar con otra empresa.'),
+        ),
+      );
+      return;
+    }
     List<InventoryItem> inventory;
     try {
       inventory = (await WorkspaceRepository.loadInventory(

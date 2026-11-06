@@ -19,6 +19,8 @@ class WorkspaceRepository {
   static const _routeJoinsKey = 'ecologismart.demo.route_joins.v1';
   static const _bucket = 'material-images';
   static final _missingSchemaTables = <String>{};
+  static bool get hasRouteEtaSchema =>
+      !_missingSchemaTables.contains('route_eta_and_delivery_stops');
 
   static bool get hasExchangeSchema =>
       !_missingSchemaTables.contains('material_exchange_requests');
@@ -293,6 +295,11 @@ class WorkspaceRepository {
     required String offeredUnit,
     String message = '',
   }) async {
+    if (listing.companyId == _ownerId(account)) {
+      throw StateError(
+        'No puedes proponer un intercambio a tu propia empresa.',
+      );
+    }
     final row = {
       'listing_id': listing.id,
       'requester_company_id': _ownerId(account),
@@ -327,6 +334,9 @@ class WorkspaceRepository {
     required CompanyAccount account,
     required MaterialListing listing,
   }) async {
+    if (listing.companyId == _ownerId(account)) {
+      throw StateError('No puedes iniciar un chat con tu propia empresa.');
+    }
     if (!_cloud || !BackendConfig.isInitialized) {
       throw StateError(
         'El chat cifrado requiere una sesión conectada a Supabase.',
@@ -508,6 +518,9 @@ class WorkspaceRepository {
     required String deliveryType,
     String cargoDescription = '',
     DateTime? travelDate,
+    double? estimatedDistanceMeters,
+    int? estimatedDurationSeconds,
+    int? routeOption,
   }) async {
     final row = {
       'company_id': _ownerId(account),
@@ -520,11 +533,25 @@ class WorkspaceRepository {
       'recipient_company_id': recipientCompanyId,
       'cargo_description': cargoDescription,
       'travel_date': travelDate?.toIso8601String().split('T').first,
+      'departure_time': travelDate == null
+          ? '08:00'
+          : '${travelDate.hour.toString().padLeft(2, '0')}:${travelDate.minute.toString().padLeft(2, '0')}',
+      'estimated_distance_meters': estimatedDistanceMeters,
+      'estimated_duration_seconds': estimatedDurationSeconds,
+      'route_option': routeOption,
       'status': 'Abierta',
       'created_at': DateTime.now().toIso8601String(),
     };
     if (_cloud) {
-      await BackendConfig.client.from('logistics_requests').insert(row);
+      try {
+        await BackendConfig.client.from('logistics_requests').insert(row);
+        _missingSchemaTables.remove('route_eta_and_delivery_stops');
+      } on PostgrestException catch (error) {
+        if (error.code == 'PGRST204' || error.code == '42703') {
+          _missingSchemaTables.add('route_eta_and_delivery_stops');
+        }
+        rethrow;
+      }
       return;
     }
     final preferences = await SharedPreferences.getInstance();
@@ -565,18 +592,39 @@ class WorkspaceRepository {
   static Future<void> requestToJoinRoute({
     required CompanyAccount account,
     required LogisticsRequest route,
+    String deliveryCity = '',
+    String deliveryAddress = '',
+    double? estimatedDistanceMeters,
+    int? estimatedDurationSeconds,
+    int? routeOption,
     String message = '',
   }) async {
+    if (route.companyId == _ownerId(account)) {
+      throw StateError('No puedes unirte a una ruta de tu propia empresa.');
+    }
     final row = {
       'route_id': route.id,
       'requester_company_id': _ownerId(account),
       'requester_company_name': account.businessName,
       'message': message,
+      'delivery_city': deliveryCity,
+      'delivery_address': deliveryAddress,
+      'estimated_distance_meters': estimatedDistanceMeters,
+      'estimated_duration_seconds': estimatedDurationSeconds,
+      'route_option': routeOption,
       'status': 'Pendiente',
       'created_at': DateTime.now().toIso8601String(),
     };
     if (_cloud) {
-      await BackendConfig.client.from('route_join_requests').insert(row);
+      try {
+        await BackendConfig.client.from('route_join_requests').insert(row);
+        _missingSchemaTables.remove('route_eta_and_delivery_stops');
+      } on PostgrestException catch (error) {
+        if (error.code == 'PGRST204' || error.code == '42703') {
+          _missingSchemaTables.add('route_eta_and_delivery_stops');
+        }
+        rethrow;
+      }
       return;
     }
     final preferences = await SharedPreferences.getInstance();

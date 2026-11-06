@@ -4,6 +4,7 @@ import '../../models/company_account.dart';
 import '../../models/operational_records.dart';
 import '../../data/resource_catalog.dart';
 import '../../services/backend_config.dart';
+import '../../services/osm_routing_service.dart';
 import '../../services/workspace_repository.dart';
 import '../../shared/components.dart';
 import '../../shared/colombian_city_field.dart';
@@ -115,10 +116,24 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
     var deliveryType = 'Materiales';
     var transportType = 'Camión';
     var travelDate = DateTime.now().add(const Duration(days: 1));
+    var routeOptions = <RouteEstimate>[];
+    RouteEstimate? selectedRoute;
+    var calculatingRoute = false;
+    String? routeError;
     if (!mounted) return;
     final result =
         await showDialog<
-          (String, String, String, String, String, String, String, DateTime)?
+          (
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            DateTime,
+            RouteEstimate?,
+          )?
         >(
           context: context,
           builder: (dialogContext) => StatefulBuilder(
@@ -132,7 +147,13 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                     children: [
                       ColombianCityField(
                         key: const ValueKey('route-origin'),
-                        onChanged: (value) => origin = value,
+                        onChanged: (value) {
+                          origin = value;
+                          setDialogState(() {
+                            selectedRoute = null;
+                            routeOptions = [];
+                          });
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -145,11 +166,21 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                             value == null || value.trim().isEmpty
                             ? 'Especifica la dirección de recogida'
                             : null,
+                        onChanged: (_) => setDialogState(() {
+                          selectedRoute = null;
+                          routeOptions = [];
+                        }),
                       ),
                       const SizedBox(height: 12),
                       ColombianCityField(
                         key: const ValueKey('route-destination'),
-                        onChanged: (value) => destination = value,
+                        onChanged: (value) {
+                          destination = value;
+                          setDialogState(() {
+                            selectedRoute = null;
+                            routeOptions = [];
+                          });
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -162,6 +193,119 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                             value == null || value.trim().isEmpty
                             ? 'Especifica la dirección de entrega'
                             : null,
+                        onChanged: (_) => setDialogState(() {
+                          selectedRoute = null;
+                          routeOptions = [];
+                        }),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed:
+                            calculatingRoute ||
+                                origin == null ||
+                                destination == null ||
+                                originAddress.text.trim().isEmpty ||
+                                destinationAddress.text.trim().isEmpty ||
+                                !{
+                                  'Camión',
+                                  'Tractocamión',
+                                  'Furgón',
+                                }.contains(transportType)
+                            ? null
+                            : () async {
+                                setDialogState(() {
+                                  calculatingRoute = true;
+                                  routeError = null;
+                                });
+                                try {
+                                  final options =
+                                      await OsmRoutingService.findRoadRoutes(
+                                        originCity: origin!,
+                                        originAddress: originAddress.text
+                                            .trim(),
+                                        destinationCity: destination!,
+                                        destinationAddress: destinationAddress
+                                            .text
+                                            .trim(),
+                                      );
+                                  setDialogState(() {
+                                    routeOptions = options;
+                                    selectedRoute = options.first;
+                                  });
+                                } catch (error) {
+                                  setDialogState(() {
+                                    routeError = error.toString().replaceFirst(
+                                      'Bad state: ',
+                                      '',
+                                    );
+                                  });
+                                } finally {
+                                  setDialogState(
+                                    () => calculatingRoute = false,
+                                  );
+                                }
+                              },
+                        icon: calculatingRoute
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.alt_route),
+                        label: Text(
+                          calculatingRoute
+                              ? 'Calculando rutas…'
+                              : 'Calcular rutas y ETA',
+                        ),
+                      ),
+                      if (routeError != null)
+                        Text(
+                          routeError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (routeOptions.isNotEmpty)
+                        DropdownButtonFormField<int>(
+                          initialValue: selectedRoute?.option,
+                          decoration: const InputDecoration(
+                            labelText: 'Ruta terrestre',
+                          ),
+                          items: routeOptions
+                              .map(
+                                (option) => DropdownMenuItem(
+                                  value: option.option,
+                                  child: Text(
+                                    'Opción ${option.option} · ${option.distanceLabel} · ${option.durationLabel}',
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setDialogState(() {
+                              selectedRoute = routeOptions.firstWhere(
+                                (option) => option.option == value,
+                              );
+                            });
+                          },
+                        ),
+                      if (selectedRoute != null)
+                        Text(
+                          'Llegada aprox.: ${_arrivalLabel(travelDate.add(Duration(seconds: selectedRoute!.durationSeconds)))} · estimación sin tráfico en vivo.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF39815D),
+                          ),
+                        ),
+                      const Text(
+                        'Perfil vial estándar: no incluye tráfico en vivo ni restricciones de peso/altura del vehículo. Tren, buque y avión no tienen ETA aquí.',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF65736A),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -195,7 +339,17 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                         ],
                         onChanged: (value) {
                           if (value != null) {
-                            setDialogState(() => transportType = value);
+                            setDialogState(() {
+                              transportType = value;
+                              if (!{
+                                'Camión',
+                                'Tractocamión',
+                                'Furgón',
+                              }.contains(value)) {
+                                selectedRoute = null;
+                                routeOptions = [];
+                              }
+                            });
                           }
                         },
                       ),
@@ -346,14 +500,6 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'La distancia y el tiempo estimado requieren conectar un servicio de mapas; todavía no hay uno configurado.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF65736A),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: () async {
                           final selected = await showDatePicker(
@@ -365,11 +511,42 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                             ),
                           );
                           if (selected != null) {
-                            setDialogState(() => travelDate = selected);
+                            setDialogState(
+                              () => travelDate = DateTime(
+                                selected.year,
+                                selected.month,
+                                selected.day,
+                                travelDate.hour,
+                                travelDate.minute,
+                              ),
+                            );
                           }
                         },
                         icon: const Icon(Icons.calendar_month_outlined),
                         label: Text('Fecha: ${_dateLabel(travelDate)}'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final selected = await showTimePicker(
+                            context: dialogContext,
+                            initialTime: TimeOfDay.fromDateTime(travelDate),
+                          );
+                          if (selected != null) {
+                            setDialogState(
+                              () => travelDate = DateTime(
+                                travelDate.year,
+                                travelDate.month,
+                                travelDate.day,
+                                selected.hour,
+                                selected.minute,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.schedule_outlined),
+                        label: Text(
+                          'Salida: ${TimeOfDay.fromDateTime(travelDate).format(dialogContext)}',
+                        ),
                       ),
                     ],
                   ),
@@ -384,6 +561,17 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                   onPressed: () {
                     if (!formKey.currentState!.validate()) return;
                     if (origin == null || destination == null) return;
+                    if ({
+                          'Camión',
+                          'Tractocamión',
+                          'Furgón',
+                        }.contains(transportType) &&
+                        selectedRoute == null) {
+                      setDialogState(
+                        () => routeError = 'Calcula y selecciona una ruta.',
+                      );
+                      return;
+                    }
                     final cargoAmount = double.parse(
                       cargoQuantity.text.trim().replaceAll(',', '.'),
                     );
@@ -399,6 +587,7 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
                       deliveryType,
                       '$cargoAmount $cargoUnit de $cargoName (${cargoCategory()})',
                       travelDate,
+                      selectedRoute,
                     ));
                   },
                   child: const Text('Enviar solicitud'),
@@ -426,6 +615,9 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
         deliveryType: result.$6,
         cargoDescription: result.$7,
         travelDate: result.$8,
+        estimatedDistanceMeters: result.$9?.distanceMeters,
+        estimatedDurationSeconds: result.$9?.durationSeconds,
+        routeOption: result.$9?.option,
       );
       await _load();
       if (mounted) {
@@ -482,6 +674,17 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
           ),
           const SizedBox(height: 12),
         ],
+        if (BackendConfig.isInitialized &&
+            !WorkspaceRepository.hasRouteEtaSchema) ...[
+          const InfoCard(
+            icon: Icons.schedule_outlined,
+            title: 'Falta activar los campos de ETA en Supabase',
+            subtitle:
+                'Ejecuta 20261106000000_route_eta_and_delivery_stops.sql después de las migraciones anteriores.',
+            color: Color(0xFFFFF0DF),
+          ),
+          const SizedBox(height: 12),
+        ],
         InfoCard(
           icon: BackendConfig.isInitialized
               ? Icons.cloud_done_outlined
@@ -493,6 +696,14 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
               ? 'Las empresas conectadas pueden ver solicitudes abiertas y buscar destinos en común.'
               : 'Estas solicitudes solo se comparten en este dispositivo. Para conectarlas entre empresas se necesita configurar Supabase.',
           color: const Color(0xFFEAF0F8),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(top: 6),
+          child: Text(
+            'Geocodificación y mapa: © OpenStreetMap contributors · rutas: OSRM',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 10, color: Color(0xFF65736A)),
+          ),
         ),
         const SizedBox(height: 8),
         SizedBox(
@@ -640,6 +851,15 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             '${route.companyName} · ${route.transportType} · ${route.deliveryType}$date',
             style: const TextStyle(fontSize: 12, color: Color(0xFF59665D)),
           ),
+          if (route.estimatedDurationSeconds != null)
+            Text(
+              'Ruta ${route.routeOption ?? 1} · ${_durationLabel(route.estimatedDurationSeconds!)} · ${_distanceLabel(route.estimatedDistanceMeters)} · llegada aprox. ${_arrivalLabel((route.travelDate ?? DateTime.now()).add(Duration(seconds: route.estimatedDurationSeconds!)))}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF39815D),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           if (route.originAddress.isNotEmpty)
             Text(
               'Recogida: ${route.originAddress}',
@@ -724,14 +944,19 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
             ),
           if (!own && mine.isNotEmpty)
             for (final request in mine)
-              _joinRequestTile(request, allowCancel: true),
+              _joinRequestTile(
+                request,
+                allowCancel: true,
+                routeDeparture: route.travelDate,
+              ),
           if (own && requests.isNotEmpty) ...[
             const Divider(),
             const Text(
               'Empresas interesadas',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
-            for (final request in requests) _joinRequestTile(request),
+            for (final request in requests)
+              _joinRequestTile(request, routeDeparture: route.travelDate),
           ],
         ],
       ),
@@ -741,13 +966,16 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
   Widget _joinRequestTile(
     RouteJoinRequest request, {
     bool allowCancel = false,
+    DateTime? routeDeparture,
   }) => Padding(
     padding: const EdgeInsets.only(top: 8),
     child: Row(
       children: [
         Expanded(
           child: Text(
-            '${request.requesterCompanyName} · ${request.status}',
+            '${request.requesterCompanyName} · ${request.status}'
+            '${request.deliveryCity.isEmpty ? '' : '\nEntrega: ${request.deliveryCity}, ${request.deliveryAddress}'}'
+            '${request.estimatedDurationSeconds == null ? '' : '\nETA aprox. (ruta ${request.routeOption ?? 1}): ${_arrivalLabel((routeDeparture ?? DateTime.now()).add(Duration(seconds: request.estimatedDurationSeconds!)))} · ${_durationLabel(request.estimatedDurationSeconds!)}'}',
             style: const TextStyle(fontSize: 12),
           ),
         ),
@@ -771,10 +999,170 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
   );
 
   Future<void> _joinRoute(LogisticsRequest route) async {
+    final formKey = GlobalKey<FormState>();
+    final deliveryAddress = TextEditingController();
+    String? deliveryCity;
+    var routeOptions = <RouteEstimate>[];
+    RouteEstimate? estimate;
+    var calculating = false;
+    String? estimateError;
+    final result = await showDialog<(String, String, RouteEstimate?)?>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Unirte a la ruta hacia ${route.destination}'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Indica tu dirección de entrega. El propietario verá tu destino y ambos podrán consultar la ETA estimada de tu tramo.',
+                ),
+                const SizedBox(height: 12),
+                ColombianCityField(
+                  onChanged: (value) {
+                    deliveryCity = value;
+                    setDialogState(() => estimate = null);
+                  },
+                ),
+                TextFormField(
+                  controller: deliveryAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección de entrega de mi empresa',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Especifica tu dirección de entrega'
+                      : null,
+                  onChanged: (_) => setDialogState(() => estimate = null),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed:
+                      calculating ||
+                          route.origin.isEmpty ||
+                          route.originAddress.isEmpty ||
+                          deliveryCity == null ||
+                          deliveryAddress.text.trim().isEmpty ||
+                          !{
+                            'Camión',
+                            'Tractocamión',
+                            'Furgón',
+                          }.contains(route.transportType)
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            calculating = true;
+                            estimateError = null;
+                          });
+                          try {
+                            final options =
+                                await OsmRoutingService.findRoadRoutes(
+                                  originCity: route.origin,
+                                  originAddress: route.originAddress,
+                                  destinationCity: deliveryCity!,
+                                  destinationAddress: deliveryAddress.text
+                                      .trim(),
+                                );
+                            setDialogState(() {
+                              routeOptions = options;
+                              estimate = options.first;
+                            });
+                          } catch (error) {
+                            setDialogState(() {
+                              estimateError = error.toString().replaceFirst(
+                                'Bad state: ',
+                                '',
+                              );
+                            });
+                          } finally {
+                            setDialogState(() => calculating = false);
+                          }
+                        },
+                  icon: calculating
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.schedule_outlined),
+                  label: Text(
+                    calculating ? 'Calculando ETA…' : 'Calcular mi ETA',
+                  ),
+                ),
+                if (estimateError != null)
+                  Text(
+                    estimateError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                if (routeOptions.isNotEmpty)
+                  DropdownButtonFormField<int>(
+                    initialValue: estimate?.option,
+                    decoration: const InputDecoration(
+                      labelText: 'Alternativa de ruta compartida',
+                    ),
+                    items: routeOptions
+                        .map(
+                          (option) => DropdownMenuItem(
+                            value: option.option,
+                            child: Text(
+                              'Opción ${option.option} · ${option.distanceLabel} · ${option.durationLabel}',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() {
+                        estimate = routeOptions.firstWhere(
+                          (option) => option.option == value,
+                        );
+                      });
+                    },
+                  ),
+                if (estimate != null)
+                  Text(
+                    'Tu tramo: ${estimate!.distanceLabel} · ${estimate!.durationLabel}. Estimación individual desde el origen, sin tráfico en vivo.',
+                    style: const TextStyle(
+                      color: Color(0xFF39815D),
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate() || deliveryCity == null) {
+                  return;
+                }
+                Navigator.pop(dialogContext, (
+                  deliveryCity!,
+                  deliveryAddress.text.trim(),
+                  estimate,
+                ));
+              },
+              child: const Text('Enviar solicitud'),
+            ),
+          ],
+        ),
+      ),
+    );
+    deliveryAddress.dispose();
+    if (result == null || !mounted) return;
     try {
       await WorkspaceRepository.requestToJoinRoute(
         account: widget.account,
         route: route,
+        deliveryCity: result.$1,
+        deliveryAddress: result.$2,
+        estimatedDistanceMeters: result.$3?.distanceMeters,
+        estimatedDurationSeconds: result.$3?.durationSeconds,
+        routeOption: result.$3?.option,
       );
       await _load();
       if (mounted) {
@@ -830,6 +1218,23 @@ class _LogisticsWorkspaceScreenState extends State<LogisticsWorkspaceScreen> {
 
   String _dateLabel(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  String _arrivalLabel(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+  String _durationLabel(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    if (hours == 0) return '$minutes min';
+    return minutes == 0 ? '$hours h' : '$hours h $minutes min';
+  }
+
+  String _distanceLabel(double? meters) {
+    if (meters == null) return 'distancia no disponible';
+    return meters >= 1000
+        ? '${(meters / 1000).toStringAsFixed(1)} km'
+        : '${meters.round()} m';
+  }
 }
 
 class _StepLine extends StatelessWidget {

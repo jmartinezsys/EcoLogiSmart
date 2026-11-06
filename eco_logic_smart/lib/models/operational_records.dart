@@ -211,6 +211,11 @@ class RouteJoinRequest {
     required this.status,
     required this.createdAt,
     this.message = '',
+    this.deliveryCity = '',
+    this.deliveryAddress = '',
+    this.estimatedDistanceMeters,
+    this.estimatedDurationSeconds,
+    this.routeOption,
   });
 
   final String id;
@@ -220,6 +225,11 @@ class RouteJoinRequest {
   final String status;
   final DateTime createdAt;
   final String message;
+  final String deliveryCity;
+  final String deliveryAddress;
+  final double? estimatedDistanceMeters;
+  final int? estimatedDurationSeconds;
+  final int? routeOption;
 
   factory RouteJoinRequest.fromJson(Map<String, dynamic> json) =>
       RouteJoinRequest(
@@ -233,6 +243,13 @@ class RouteJoinRequest {
             DateTime.tryParse(json['created_at'] as String? ?? '') ??
             DateTime.now(),
         message: json['message'] as String? ?? '',
+        deliveryCity: json['delivery_city'] as String? ?? '',
+        deliveryAddress: json['delivery_address'] as String? ?? '',
+        estimatedDistanceMeters: (json['estimated_distance_meters'] as num?)
+            ?.toDouble(),
+        estimatedDurationSeconds: (json['estimated_duration_seconds'] as num?)
+            ?.toInt(),
+        routeOption: (json['route_option'] as num?)?.toInt(),
       );
 }
 
@@ -252,6 +269,9 @@ class LogisticsRequest {
     this.cargoDescription = '',
     this.status = 'Abierta',
     this.travelDate,
+    this.estimatedDistanceMeters,
+    this.estimatedDurationSeconds,
+    this.routeOption,
   });
 
   final String id;
@@ -268,6 +288,9 @@ class LogisticsRequest {
   final String cargoDescription;
   final String status;
   final DateTime? travelDate;
+  final double? estimatedDistanceMeters;
+  final int? estimatedDurationSeconds;
+  final int? routeOption;
 
   factory LogisticsRequest.fromJson(Map<String, dynamic> json) =>
       LogisticsRequest(
@@ -286,7 +309,12 @@ class LogisticsRequest {
         recipientCompanyId: json['recipient_company_id'] as String?,
         cargoDescription: json['cargo_description'] as String? ?? '',
         status: json['status'] as String? ?? 'Abierta',
-        travelDate: DateTime.tryParse(json['travel_date'] as String? ?? ''),
+        travelDate: _parseRouteDeparture(json),
+        estimatedDistanceMeters: (json['estimated_distance_meters'] as num?)
+            ?.toDouble(),
+        estimatedDurationSeconds: (json['estimated_duration_seconds'] as num?)
+            ?.toInt(),
+        routeOption: (json['route_option'] as num?)?.toInt(),
       );
 
   Map<String, Object?> toJson() => {
@@ -299,6 +327,21 @@ class LogisticsRequest {
     'recipient_company_id': recipientCompanyId,
     'cargo_description': cargoDescription,
     'travel_date': travelDate?.toIso8601String(),
+    'departure_time': travelDate == null
+        ? '08:00'
+        : '${travelDate!.hour.toString().padLeft(2, '0')}:${travelDate!.minute.toString().padLeft(2, '0')}',
     'status': status,
+    'estimated_distance_meters': estimatedDistanceMeters,
+    'estimated_duration_seconds': estimatedDurationSeconds,
+    'route_option': routeOption,
   };
+}
+
+DateTime? _parseRouteDeparture(Map<String, dynamic> json) {
+  final date = DateTime.tryParse(json['travel_date'] as String? ?? '');
+  if (date == null) return null;
+  final parts = (json['departure_time'] as String? ?? '08:00').split(':');
+  final hour = int.tryParse(parts.first) ?? 8;
+  final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+  return DateTime(date.year, date.month, date.day, hour, minute);
 }
